@@ -1,0 +1,18 @@
+# Java
+backend/build/
+backend/.gradle/
+backend/out/
+
+# Python
+rag-server/__pycache__/
+rag-server/.venv/
+rag-server/*.pyc
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Env
+.env
+*.env
