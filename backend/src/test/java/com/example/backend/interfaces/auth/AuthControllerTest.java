@@ -5,9 +5,12 @@ import com.example.backend.application.auth.TokenResult;
 import com.example.backend.common.config.SecurityConfig;
 import com.example.backend.common.exception.CustomException;
 import com.example.backend.common.exception.ErrorCode;
+import com.example.backend.common.security.JwtAccessDeniedHandler;
+import com.example.backend.common.security.JwtAuthenticationEntryPoint;
 import com.example.backend.common.security.JwtAuthenticationFilter;
 import com.example.backend.infrastructure.auth.JwtProvider;
 import com.example.backend.interfaces.auth.dto.AuthLoginRequest;
+import com.example.backend.interfaces.auth.dto.AuthRefreshRequest;
 import com.example.backend.interfaces.auth.dto.AuthSignupRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -19,6 +22,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import org.springframework.security.test.context.support.WithMockUser;
+
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
@@ -28,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = AuthController.class)
-@Import({SecurityConfig.class, JwtAuthenticationFilter.class})
+@Import({SecurityConfig.class, JwtAuthenticationFilter.class, JwtAuthenticationEntryPoint.class, JwtAccessDeniedHandler.class})
 class AuthControllerTest {
 
     @Autowired
@@ -117,5 +122,46 @@ class AuthControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("AUTH_001"));
+    }
+
+    @Test
+    @DisplayName("토큰 갱신 성공 시 200 OK와 새 토큰 반환")
+    void refresh_success() throws Exception {
+        var request = new AuthRefreshRequest("valid-refresh-token");
+        given(authService.refresh(anyString()))
+                .willReturn(new TokenResult("new-access", "new-refresh"));
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").value("new-access"))
+                .andExpect(jsonPath("$.data.refreshToken").value("new-refresh"));
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 리프레시 토큰으로 갱신 시 401 반환")
+    void refresh_invalidToken() throws Exception {
+        var request = new AuthRefreshRequest("invalid-token");
+        given(authService.refresh(anyString()))
+                .willThrow(new CustomException(ErrorCode.AUTH_TOKEN_INVALID));
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTH_003"));
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("로그아웃 성공 시 200 OK 반환")
+    void logout_success() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
     }
 }

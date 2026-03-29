@@ -105,4 +105,52 @@ class AuthServiceTest {
                 .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                         .isEqualTo(ErrorCode.AUTH_LOGIN_FAIL));
     }
+
+    @Test
+    @DisplayName("토큰 갱신 성공 - 새 액세스/리프레시 토큰 반환")
+    void refresh_success() {
+        given(jwtProvider.validateToken("valid-refresh")).willReturn(true);
+        given(jwtProvider.getUserId("valid-refresh")).willReturn(1L);
+        given(redisTokenRepository.getRefreshToken(1L)).willReturn(Optional.of("valid-refresh"));
+        given(jwtProvider.generateAccessToken(1L)).willReturn("new-access");
+        given(jwtProvider.generateRefreshToken(1L)).willReturn("new-refresh");
+
+        TokenResult result = authService.refresh("valid-refresh");
+
+        assertThat(result.accessToken()).isEqualTo("new-access");
+        assertThat(result.refreshToken()).isEqualTo("new-refresh");
+        verify(redisTokenRepository).saveRefreshToken(1L, "new-refresh");
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 리프레시 토큰으로 갱신 시 AUTH_TOKEN_INVALID 예외 발생")
+    void refresh_invalidToken() {
+        given(jwtProvider.validateToken("invalid")).willReturn(false);
+
+        assertThatThrownBy(() -> authService.refresh("invalid"))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(ErrorCode.AUTH_TOKEN_INVALID));
+    }
+
+    @Test
+    @DisplayName("Redis에 없는 리프레시 토큰으로 갱신 시 AUTH_TOKEN_INVALID 예외 발생")
+    void refresh_tokenNotInRedis() {
+        given(jwtProvider.validateToken("valid-refresh")).willReturn(true);
+        given(jwtProvider.getUserId("valid-refresh")).willReturn(1L);
+        given(redisTokenRepository.getRefreshToken(1L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.refresh("valid-refresh"))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(ErrorCode.AUTH_TOKEN_INVALID));
+    }
+
+    @Test
+    @DisplayName("로그아웃 시 Redis에서 리프레시 토큰 삭제")
+    void logout_success() {
+        authService.logout(1L);
+
+        verify(redisTokenRepository).deleteRefreshToken(1L);
+    }
 }
