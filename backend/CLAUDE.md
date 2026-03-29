@@ -23,7 +23,7 @@ RAG 처리는 Python FastAPI 서버에 위임한다.
 # Package Structure
 com.example.backend
   interfaces/        ← Controller, Request/Response DTO
-  application/       ← Service, UseCase (비즈니스 로직 조율)
+  application/       ← Service (비즈니스 로직 조율)
   domain/            ← Entity, Repository 인터페이스, 도메인 규칙
   infrastructure/    ← JPA 구현체, Redis, WebClient 등 외부 기술
   common/            ← 예외, 공통 응답 포맷, 설정
@@ -34,7 +34,6 @@ query/     질의 처리, RAG 서버 연동, 검색 이력
 
 # Naming Convention
 - Controller  : {Domain}Controller
-- UseCase     : {Action}{Domain}UseCase (예: SignupUseCase, QueryUseCase)
 - Service     : {Domain}Service
 - Repository  : {Domain}Repository (인터페이스), {Domain}JpaRepository (구현체)
 - DTO         : {Domain}{Action}Request / {Domain}{Action}Response
@@ -96,7 +95,7 @@ query/     질의 처리, RAG 서버 연동, 검색 이력
 - DTO는 interfaces 계층에만 위치한다
 - 공통 응답은 ApiResponse<T> 로 통일한다
 - 예외는 CustomException + ErrorCode + GlobalExceptionHandler 패턴을 따른다
-- MVP 구조: Controller → UseCase → Service → Repository 순서로 구성한다
+- MVP 구조: Controller → Service → Repository 순서로 구성한다
 
 ### 3. 테스트 코드
 - 모든 기능 구현 후 테스트 코드를 함께 작성한다
