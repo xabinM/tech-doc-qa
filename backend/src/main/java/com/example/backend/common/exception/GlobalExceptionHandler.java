@@ -2,6 +2,7 @@ package com.example.backend.common.exception;
 
 import com.example.backend.common.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -18,6 +19,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(e.getErrorCode().getHttpStatus())
                 .body(ApiResponse.fail(e.getErrorCode()));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(DataIntegrityViolationException e) {
+        log.warn("DataIntegrityViolationException: {}", e.getMessage());
+        return ResponseEntity
+                .status(ErrorCode.AUTH_EMAIL_DUPLICATE.getHttpStatus())
+                .body(ApiResponse.fail(ErrorCode.AUTH_EMAIL_DUPLICATE));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
