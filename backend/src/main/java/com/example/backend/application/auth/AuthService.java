@@ -44,4 +44,28 @@ public class AuthService {
 
         return new TokenResult(accessToken, refreshToken);
     }
+
+    public TokenResult refresh(String refreshToken) {
+        if (!jwtProvider.validateToken(refreshToken)) {
+            throw new CustomException(ErrorCode.AUTH_TOKEN_INVALID);
+        }
+
+        Long userId = jwtProvider.getUserId(refreshToken);
+        String stored = redisTokenRepository.getRefreshToken(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.AUTH_TOKEN_INVALID));
+
+        if (!stored.equals(refreshToken)) {
+            throw new CustomException(ErrorCode.AUTH_TOKEN_INVALID);
+        }
+
+        String newAccessToken = jwtProvider.generateAccessToken(userId);
+        String newRefreshToken = jwtProvider.generateRefreshToken(userId);
+        redisTokenRepository.saveRefreshToken(userId, newRefreshToken);
+
+        return new TokenResult(newAccessToken, newRefreshToken);
+    }
+
+    public void logout(Long userId) {
+        redisTokenRepository.deleteRefreshToken(userId);
+    }
 }

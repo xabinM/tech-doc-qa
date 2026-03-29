@@ -6,6 +6,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
+import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
@@ -28,5 +29,9 @@ public class RedisTokenRepository {
 
     public void deleteRefreshToken(Long userId) {
         redisTemplate.delete(REFRESH_TOKEN_PREFIX + userId);
+    }
+
+    public Optional<String> getRefreshToken(Long userId) {
+        return Optional.ofNullable(redisTemplate.opsForValue().get(REFRESH_TOKEN_PREFIX + userId));
     }
 }

@@ -5,10 +5,12 @@ import com.example.backend.application.auth.TokenResult;
 import com.example.backend.common.response.ApiResponse;
 import com.example.backend.interfaces.auth.dto.AuthLoginRequest;
 import com.example.backend.interfaces.auth.dto.AuthLoginResponse;
+import com.example.backend.interfaces.auth.dto.AuthRefreshRequest;
 import com.example.backend.interfaces.auth.dto.AuthSignupRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,5 +33,17 @@ public class AuthController {
     public ResponseEntity<ApiResponse<AuthLoginResponse>> login(@RequestBody @Valid AuthLoginRequest request) {
         TokenResult result = authService.login(request.email(), request.password());
         return ResponseEntity.ok(ApiResponse.ok(AuthLoginResponse.from(result)));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<AuthLoginResponse>> refresh(@RequestBody @Valid AuthRefreshRequest request) {
+        TokenResult result = authService.refresh(request.refreshToken());
+        return ResponseEntity.ok(ApiResponse.ok(AuthLoginResponse.from(result)));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(@AuthenticationPrincipal Long userId) {
+        authService.logout(userId);
+        return ResponseEntity.ok(ApiResponse.ok());
     }
 }
