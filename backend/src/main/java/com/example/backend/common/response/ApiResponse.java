@@ -30,6 +30,10 @@ public class ApiResponse<T> {
         return new ApiResponse<>(false, null, new ErrorResponse(errorCode.getCode(), errorCode.getMessage()));
     }
 
+    public static ApiResponse<Void> fail(ErrorCode errorCode, String message) {
+        return new ApiResponse<>(false, null, new ErrorResponse(errorCode.getCode(), message));
+    }
+
     @Getter
     public static class ErrorResponse {
         private final String code;

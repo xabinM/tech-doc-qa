@@ -38,7 +38,7 @@ public class GlobalExceptionHandler {
         log.warn("ValidationException: {}", message);
         return ResponseEntity
                 .badRequest()
-                .body(ApiResponse.fail(ErrorCode.INVALID_INPUT));
+                .body(ApiResponse.fail(ErrorCode.INVALID_INPUT, message));
     }
 
     @ExceptionHandler(Exception.class)
