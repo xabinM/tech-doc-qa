@@ -13,6 +13,7 @@ public enum ErrorCode {
     AUTH_EMAIL_DUPLICATE("AUTH_002", "이미 사용 중인 이메일입니다", HttpStatus.CONFLICT),
     AUTH_TOKEN_INVALID("AUTH_003", "유효하지 않은 토큰입니다", HttpStatus.UNAUTHORIZED),
     AUTH_TOKEN_EXPIRED("AUTH_004", "만료된 토큰입니다", HttpStatus.UNAUTHORIZED),
+    AUTH_FORBIDDEN("AUTH_005", "접근 권한이 없습니다", HttpStatus.FORBIDDEN),
 
     // Query
     QUERY_RAG_SERVER_ERROR("QUERY_001", "답변 생성 중 오류가 발생했습니다", HttpStatus.SERVICE_UNAVAILABLE),
