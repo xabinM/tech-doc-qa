@@ -23,10 +23,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(DataIntegrityViolationException e) {
-        log.warn("DataIntegrityViolationException: {}", e.getMessage());
+        log.error("DataIntegrityViolationException: {}", e.getMessage());
         return ResponseEntity
-                .status(ErrorCode.AUTH_EMAIL_DUPLICATE.getHttpStatus())
-                .body(ApiResponse.fail(ErrorCode.AUTH_EMAIL_DUPLICATE));
+                .internalServerError()
+                .body(ApiResponse.fail(ErrorCode.INTERNAL_SERVER_ERROR));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
