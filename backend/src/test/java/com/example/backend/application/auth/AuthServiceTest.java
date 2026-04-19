@@ -1,11 +1,11 @@
 package com.example.backend.application.auth;
 
+import com.example.backend.application.auth.port.RefreshTokenStore;
+import com.example.backend.application.auth.port.TokenManager;
 import com.example.backend.common.exception.CustomException;
 import com.example.backend.common.exception.ErrorCode;
 import com.example.backend.domain.auth.User;
 import com.example.backend.domain.auth.UserRepository;
-import com.example.backend.infrastructure.auth.JwtProvider;
-import com.example.backend.infrastructure.auth.RedisTokenRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,8 +20,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -36,10 +39,10 @@ class AuthServiceTest {
     PasswordEncoder passwordEncoder;
 
     @Mock
-    JwtProvider jwtProvider;
+    TokenManager tokenManager;
 
     @Mock
-    RedisTokenRepository redisTokenRepository;
+    RefreshTokenStore refreshTokenStore;
 
     @Test
     @DisplayName("회원가입 성공")
@@ -72,14 +75,14 @@ class AuthServiceTest {
         User user = User.create("test@example.com", "encoded");
         given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(user));
         given(passwordEncoder.matches("password1", "encoded")).willReturn(true);
-        given(jwtProvider.generateAccessToken(any())).willReturn("access-token");
-        given(jwtProvider.generateRefreshToken(any())).willReturn("refresh-token");
+        given(tokenManager.generateAccessToken(any())).willReturn("access-token");
+        given(tokenManager.generateRefreshToken(any())).willReturn("refresh-token");
 
         TokenResult result = authService.login("test@example.com", "password1");
 
         assertThat(result.accessToken()).isEqualTo("access-token");
         assertThat(result.refreshToken()).isEqualTo("refresh-token");
-        verify(redisTokenRepository).saveRefreshToken(any(), eq("refresh-token"));
+        verify(refreshTokenStore).save(any(), eq("refresh-token"));
     }
 
     @Test
@@ -109,23 +112,23 @@ class AuthServiceTest {
     @Test
     @DisplayName("토큰 갱신 성공 - 새 액세스/리프레시 토큰 반환")
     void refresh_success() {
-        given(jwtProvider.validateToken("valid-refresh")).willReturn(true);
-        given(jwtProvider.getUserId("valid-refresh")).willReturn(1L);
-        given(redisTokenRepository.getRefreshToken(1L)).willReturn(Optional.of("valid-refresh"));
-        given(jwtProvider.generateAccessToken(1L)).willReturn("new-access");
-        given(jwtProvider.generateRefreshToken(1L)).willReturn("new-refresh");
+        given(refreshTokenStore.get(1L)).willReturn(Optional.of("valid-refresh"));
+        given(tokenManager.getUserId("valid-refresh")).willReturn(1L);
+        given(tokenManager.generateAccessToken(1L)).willReturn("new-access");
+        given(tokenManager.generateRefreshToken(1L)).willReturn("new-refresh");
 
         TokenResult result = authService.refresh("valid-refresh");
 
         assertThat(result.accessToken()).isEqualTo("new-access");
         assertThat(result.refreshToken()).isEqualTo("new-refresh");
-        verify(redisTokenRepository).saveRefreshToken(1L, "new-refresh");
+        verify(refreshTokenStore).save(1L, "new-refresh");
     }
 
     @Test
     @DisplayName("유효하지 않은 리프레시 토큰으로 갱신 시 AUTH_TOKEN_INVALID 예외 발생")
     void refresh_invalidToken() {
-        given(jwtProvider.validateToken("invalid")).willReturn(false);
+        willThrow(new CustomException(ErrorCode.AUTH_TOKEN_INVALID))
+                .given(tokenManager).validateRefreshToken("invalid");
 
         assertThatThrownBy(() -> authService.refresh("invalid"))
                 .isInstanceOf(CustomException.class)
@@ -134,11 +137,22 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("만료된 리프레시 토큰으로 갱신 시 AUTH_TOKEN_EXPIRED 예외 발생")
+    void refresh_expiredToken() {
+        willThrow(new CustomException(ErrorCode.AUTH_TOKEN_EXPIRED))
+                .given(tokenManager).validateRefreshToken("expired-refresh");
+
+        assertThatThrownBy(() -> authService.refresh("expired-refresh"))
+                .isInstanceOf(CustomException.class)
+                .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                        .isEqualTo(ErrorCode.AUTH_TOKEN_EXPIRED));
+    }
+
+    @Test
     @DisplayName("Redis에 없는 리프레시 토큰으로 갱신 시 AUTH_TOKEN_INVALID 예외 발생")
     void refresh_tokenNotInRedis() {
-        given(jwtProvider.validateToken("valid-refresh")).willReturn(true);
-        given(jwtProvider.getUserId("valid-refresh")).willReturn(1L);
-        given(redisTokenRepository.getRefreshToken(1L)).willReturn(Optional.empty());
+        given(tokenManager.getUserId("valid-refresh")).willReturn(1L);
+        given(refreshTokenStore.get(1L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> authService.refresh("valid-refresh"))
                 .isInstanceOf(CustomException.class)
@@ -151,6 +165,6 @@ class AuthServiceTest {
     void logout_success() {
         authService.logout(1L);
 
-        verify(redisTokenRepository).deleteRefreshToken(1L);
+        verify(refreshTokenStore).delete(1L);
     }
 }

@@ -7,8 +7,8 @@ import com.example.backend.common.exception.CustomException;
 import com.example.backend.common.exception.ErrorCode;
 import com.example.backend.common.security.JwtAccessDeniedHandler;
 import com.example.backend.common.security.JwtAuthenticationEntryPoint;
+import com.example.backend.application.auth.port.TokenManager;
 import com.example.backend.common.security.JwtAuthenticationFilter;
-import com.example.backend.infrastructure.auth.JwtProvider;
 import com.example.backend.interfaces.auth.dto.AuthLoginRequest;
 import com.example.backend.interfaces.auth.dto.AuthRefreshRequest;
 import com.example.backend.interfaces.auth.dto.AuthSignupRequest;
@@ -46,7 +46,7 @@ class AuthControllerTest {
     AuthService authService;
 
     @MockitoBean
-    JwtProvider jwtProvider;
+    TokenManager tokenManager;
 
     @Test
     @DisplayName("회원가입 성공 시 200 OK와 success:true 반환")

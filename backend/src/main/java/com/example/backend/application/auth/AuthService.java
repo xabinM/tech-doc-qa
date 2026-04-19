@@ -1,11 +1,11 @@
 package com.example.backend.application.auth;
 
+import com.example.backend.application.auth.port.RefreshTokenStore;
+import com.example.backend.application.auth.port.TokenManager;
 import com.example.backend.common.exception.CustomException;
 import com.example.backend.common.exception.ErrorCode;
 import com.example.backend.domain.auth.User;
 import com.example.backend.domain.auth.UserRepository;
-import com.example.backend.infrastructure.auth.JwtProvider;
-import com.example.backend.infrastructure.auth.RedisTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -18,8 +18,8 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtProvider jwtProvider;
-    private final RedisTokenRepository redisTokenRepository;
+    private final TokenManager tokenManager;
+    private final RefreshTokenStore refreshTokenStore;
 
     @Transactional
     public void signup(String email, String password) {
@@ -38,34 +38,32 @@ public class AuthService {
             throw new CustomException(ErrorCode.AUTH_LOGIN_FAIL);
         }
 
-        String accessToken = jwtProvider.generateAccessToken(user.getId());
-        String refreshToken = jwtProvider.generateRefreshToken(user.getId());
-        redisTokenRepository.saveRefreshToken(user.getId(), refreshToken);
+        String accessToken = tokenManager.generateAccessToken(user.getId());
+        String refreshToken = tokenManager.generateRefreshToken(user.getId());
+        refreshTokenStore.save(user.getId(), refreshToken);
 
         return new TokenResult(accessToken, refreshToken);
     }
 
     public TokenResult refresh(String refreshToken) {
-        if (!jwtProvider.validateToken(refreshToken)) {
-            throw new CustomException(ErrorCode.AUTH_TOKEN_INVALID);
-        }
+        tokenManager.validateRefreshToken(refreshToken); // 만료: AUTH_TOKEN_EXPIRED, 위변조: AUTH_TOKEN_INVALID
 
-        Long userId = jwtProvider.getUserId(refreshToken);
-        String stored = redisTokenRepository.getRefreshToken(userId)
+        Long userId = tokenManager.getUserId(refreshToken);
+        String stored = refreshTokenStore.get(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.AUTH_TOKEN_INVALID));
 
         if (!stored.equals(refreshToken)) {
             throw new CustomException(ErrorCode.AUTH_TOKEN_INVALID);
         }
 
-        String newAccessToken = jwtProvider.generateAccessToken(userId);
-        String newRefreshToken = jwtProvider.generateRefreshToken(userId);
-        redisTokenRepository.saveRefreshToken(userId, newRefreshToken);
+        String newAccessToken = tokenManager.generateAccessToken(userId);
+        String newRefreshToken = tokenManager.generateRefreshToken(userId);
+        refreshTokenStore.save(userId, newRefreshToken);
 
         return new TokenResult(newAccessToken, newRefreshToken);
     }
 
     public void logout(Long userId) {
-        redisTokenRepository.deleteRefreshToken(userId);
+        refreshTokenStore.delete(userId);
     }
 }
