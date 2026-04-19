@@ -4,10 +4,10 @@ Spring Boot 3.5.x (Java 21) 기반 API 서버.
 RAG 처리는 Python FastAPI 서버에 위임한다.
 
 # Current Status
-- [ ] auth 도메인 구현
+- [x] auth 도메인 구현 (회원가입, 로그인, 토큰 갱신, 로그아웃)
+- [x] 테스트 코드 (AuthService 단위 테스트, AuthController 통합 테스트)
 - [ ] query 도메인 구현
 - [ ] RAG 서버 연동
-- [ ] 테스트 코드
 
 # Environment
 - Spring Boot: 3.5.x
