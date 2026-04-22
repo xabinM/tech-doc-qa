@@ -1,6 +1,10 @@
 package com.example.backend.infrastructure.auth;
 
+import com.example.backend.application.auth.port.TokenManager;
+import com.example.backend.common.exception.CustomException;
+import com.example.backend.common.exception.ErrorCode;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -12,7 +16,7 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 
 @Component
-public class JwtProvider {
+public class JwtProvider implements TokenManager {
 
     private final SecretKey secretKey;
     private final long accessTokenExpiry;
@@ -28,15 +32,29 @@ public class JwtProvider {
         this.refreshTokenExpiry = refreshTokenExpiry;
     }
 
+    @Override
     public String generateAccessToken(Long userId) {
         return buildToken(userId, accessTokenExpiry);
     }
 
+    @Override
     public String generateRefreshToken(Long userId) {
         return buildToken(userId, refreshTokenExpiry);
     }
 
-    public boolean validateToken(String token) {
+    @Override
+    public void validateRefreshToken(String token) {
+        try {
+            Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token);
+        } catch (ExpiredJwtException e) {
+            throw new CustomException(ErrorCode.AUTH_TOKEN_EXPIRED);
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new CustomException(ErrorCode.AUTH_TOKEN_INVALID);
+        }
+    }
+
+    @Override
+    public boolean validateAccessToken(String token) {
         try {
             Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token);
             return true;
@@ -45,6 +63,7 @@ public class JwtProvider {
         }
     }
 
+    @Override
     public Long getUserId(String token) {
         Claims claims = Jwts.parser()
                 .verifyWith(secretKey)

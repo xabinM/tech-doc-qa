@@ -1,5 +1,6 @@
 package com.example.backend.infrastructure.auth;
 
+import com.example.backend.application.auth.port.RefreshTokenStore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -10,7 +11,7 @@ import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
-public class RedisTokenRepository {
+public class RedisTokenRepository implements RefreshTokenStore {
 
     private static final String REFRESH_TOKEN_PREFIX = "refresh:";
 
@@ -19,7 +20,8 @@ public class RedisTokenRepository {
     @Value("${jwt.refresh-token-expiry}")
     private long refreshTokenExpiry;
 
-    public void saveRefreshToken(Long userId, String refreshToken) {
+    @Override
+    public void save(Long userId, String refreshToken) {
         redisTemplate.opsForValue().set(
                 REFRESH_TOKEN_PREFIX + userId,
                 refreshToken,
@@ -27,11 +29,13 @@ public class RedisTokenRepository {
         );
     }
 
-    public void deleteRefreshToken(Long userId) {
+    @Override
+    public void delete(Long userId) {
         redisTemplate.delete(REFRESH_TOKEN_PREFIX + userId);
     }
 
-    public Optional<String> getRefreshToken(Long userId) {
+    @Override
+    public Optional<String> get(Long userId) {
         return Optional.ofNullable(redisTemplate.opsForValue().get(REFRESH_TOKEN_PREFIX + userId));
     }
 }

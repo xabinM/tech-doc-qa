@@ -40,6 +40,10 @@ dependencies {
 	// Circuit Breaker
 	implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
 
+	// Flyway
+	implementation 'org.flywaydb:flyway-core'
+	implementation 'org.flywaydb:flyway-database-postgresql'
+
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'org.postgresql:postgresql'
 	annotationProcessor 'org.projectlombok:lombok'
