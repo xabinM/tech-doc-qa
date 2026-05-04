@@ -53,13 +53,13 @@ class QueryServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(queryService, "dailyMax", 20);
-        given(redisTemplate.opsForValue()).willReturn(valueOperations);
     }
 
     @Test
     @DisplayName("질의 성공 - RAG 답변 반환 및 이벤트 발행")
     void query_success() {
         String rateKey = "rate:1:" + LocalDate.now();
+        given(redisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.increment(rateKey)).willReturn(1L);
         given(ragPort.ask("Spring이란?")).willReturn("Spring은 자바 프레임워크입니다.");
 
@@ -78,6 +78,7 @@ class QueryServiceTest {
     @DisplayName("일일 요청 한도 초과 시 QUERY_RATE_LIMIT_EXCEEDED 예외 발생")
     void query_rateLimitExceeded() {
         String rateKey = "rate:1:" + LocalDate.now();
+        given(redisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.increment(rateKey)).willReturn(21L);
 
         assertThatThrownBy(() -> queryService.query(1L, "Spring이란?"))
