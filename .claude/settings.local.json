@@ -4,7 +4,29 @@
       "Bash(git checkout *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git branch *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(cd backend && ./gradlew test*)",
+      "Bash(cd backend && ./gradlew build*)",
+      "Bash(cd backend && ./gradlew compileJava*)",
+      "Bash(grep -rn * backend/src/)",
+      "Bash(find backend/src/ *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'echo \"$CLAUDE_TOOL_OUTPUT\" | grep -qiE \"(BUILD FAILED|FAILURE:|error:|Exception in)\" && echo \"[hook] 빌드/테스트 실패 감지됨. 원인을 분석하세요.\" || true'"
+          }
+        ]
+      }
     ]
   }
 }
