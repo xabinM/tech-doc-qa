@@ -69,3 +69,13 @@ query/     질의 처리, RAG 서버 연동, 검색 이력
 - RAG 서버 호출 중 DB 트랜잭션이 열려있으면 안 됨 (커넥션 풀 고갈)
 - 단위 테스트(Mockito) + 통합 테스트(MockMvc) 함께 작성
 - 외부 의존성 (RAG 서버, Redis 등)은 Mock 처리
+
+# Rules
+
+@../.claude/rules/testing.md
+@../.claude/rules/transaction-db.md
+@../.claude/rules/security.md
+@../.claude/rules/async-event.md
+@../.claude/rules/api-response.md
+@../.claude/rules/webclient.md
+@../.claude/rules/code-style.md
