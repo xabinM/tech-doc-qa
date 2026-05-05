@@ -14,9 +14,34 @@
       "Bash(cd backend && ./gradlew compileJava*)",
       "Bash(grep -rn * backend/src/)",
       "Bash(find backend/src/ *)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean*)",
+      "Bash(git branch -D*)",
+      "Bash(git checkout -- *)",
+      "Bash(git restore .)",
+      "Bash(git restore --staged .)",
+      "Bash(rm -rf *)",
+      "Bash(rm -f *)",
+      "Bash(docker-compose down -v*)",
+      "Bash(docker compose down -v*)"
     ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'CMD=\"$CLAUDE_TOOL_INPUT\"; WARNINGS=\"\"; echo \"$CMD\" | grep -qiE \"(DROP TABLE|DROP DATABASE|TRUNCATE)\" && WARNINGS=\"$WARNINGS\\n[CRITICAL] SQL 데이터 파괴 명령 감지: DROP/TRUNCATE\"; echo \"$CMD\" | grep -qE \"db/migration/V[0-9]\" && echo \"$CMD\" | grep -qiE \"(rm |del |sed -i|> )\" && WARNINGS=\"$WARNINGS\\n[CRITICAL] Flyway 마이그레이션 파일 수정/삭제 감지\"; echo \"$CMD\" | grep -qiE \"git add.*\\.env\" && WARNINGS=\"$WARNINGS\\n[CRITICAL] .env 파일 스테이징 감지 — 민감 정보 커밋 위험\"; echo \"$CMD\" | grep -qiE \"(password|secret|token).*=\" && echo \"$CMD\" | grep -qiE \"git (add|commit)\" && WARNINGS=\"$WARNINGS\\n[WARN] 민감 정보가 포함된 파일 커밋 가능성\"; echo \"$CMD\" | grep -qiE \"\\.claude/(rules|agents|commands)/.*\\.(md)\" && echo \"$CMD\" | grep -qiE \"(rm |del )\" && WARNINGS=\"$WARNINGS\\n[CRITICAL] Harness 파일 삭제 감지 — 사용자 확인 필요\"; [ -n \"$WARNINGS\" ] && echo -e \"$WARNINGS\" && exit 2 || true'"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Bash",

@@ -97,3 +97,24 @@ Transform tasks into verifiable goals:
 - "Refactor X" → "Ensure tests pass before and after"
 
 For multi-step tasks, state a brief plan and get confirmation before starting.
+
+## 5. Destructive Action Rules
+
+**아래 행동은 반드시 사용자에게 명시적으로 확인을 받은 후에만 실행한다. 자율적으로 진행 금지.**
+
+### 절대 자율 실행 금지 (항상 멈추고 확인)
+- **Flyway 마이그레이션 파일 수정 또는 삭제** — 운영 DB 파괴로 이어짐
+- **`.env` 또는 민감 정보 파일 git add/commit** — 비밀 정보 유출
+- **`git push --force`** — 공유 브랜치 이력 파괴
+- **`git reset --hard`** — 커밋되지 않은 작업 영구 소멸
+- **`git clean -f`** — untracked 파일 전부 삭제
+- **`docker-compose down -v`** — DB 볼륨 삭제, 데이터 전체 소멸
+- **`DROP TABLE` / `TRUNCATE`** — 테이블 데이터 삭제
+- **`rm -rf`** — 디렉토리 재귀 삭제
+- **harness 파일 삭제** (`.claude/rules/`, `.claude/agents/`, `.claude/commands/`) — Claude 동작 기반 파괴
+
+### 확인 절차
+위 행동이 필요하다고 판단되면:
+1. 어떤 행동을 왜 하려는지 설명
+2. 되돌릴 수 없음을 명시
+3. 사용자의 명시적 "진행해" 또는 "yes" 확인 후 실행
