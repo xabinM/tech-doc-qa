@@ -20,7 +20,9 @@
       "Bash(Sort-Object FullName)",
       "Bash(docker --version)",
       "Bash(docker compose *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(grep -h \"^description:\" .claude/agents/*.md)",
+      "Bash(grep:*)"
     ],
     "deny": [
       "Bash(git push --force*)",
