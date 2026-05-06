@@ -14,7 +14,13 @@
       "Bash(cd backend && ./gradlew compileJava*)",
       "Bash(grep -rn * backend/src/)",
       "Bash(find backend/src/ *)",
-      "Bash(chmod +x *)"
+      "Bash(chmod +x *)",
+      "Bash(Get-ChildItem -Recurse -Path \"C:\\\\root_project\" -Force)",
+      "Bash(Select-Object FullName)",
+      "Bash(Sort-Object FullName)",
+      "Bash(docker --version)",
+      "Bash(docker compose *)",
+      "Bash(git *)"
     ],
     "deny": [
       "Bash(git push --force*)",

@@ -31,3 +31,20 @@ jwt:
   secret: ${JWT_SECRET}
   access-token-expiry: 3600000    # 1시간
   refresh-token-expiry: 604800000 # 7일
+
+rag:
+  server:
+    url: ${RAG_SERVER_URL:http://localhost:8000}
+    connect-timeout-ms: 3000
+    read-timeout-ms: 30000
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      ragServer:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
