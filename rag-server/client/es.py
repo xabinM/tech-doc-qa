@@ -4,7 +4,11 @@ from config import settings
 _es = AsyncElasticsearch(settings.es_url)
 
 
-async def search_docs(question: str) -> list[str]:
+async def ping() -> bool:
+    return await _es.ping()
+
+
+async def search_docs(question: str) -> list[dict]:
     resp = await _es.search(
         index=settings.es_index,
         body={
@@ -15,7 +19,7 @@ async def search_docs(question: str) -> list[str]:
                 }
             },
             "size": settings.search_size,
-            "_source": ["content"],
+            "_source": ["content", "url"],
         },
     )
-    return [hit["_source"]["content"] for hit in resp["hits"]["hits"]]
+    return [hit["_source"] for hit in resp["hits"]["hits"]]

@@ -11,9 +11,10 @@ class AskRequest(BaseModel):
 
 class AskResponse(BaseModel):
     answer: str
+    sources: list[str]
 
 
 @router.post("/ask", response_model=AskResponse)
 async def ask(request: AskRequest) -> AskResponse:
-    answer = await rag.ask(request.question)
-    return AskResponse(answer=answer)
+    answer, sources = await rag.ask(request.question)
+    return AskResponse(answer=answer, sources=sources)
