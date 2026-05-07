@@ -24,10 +24,15 @@ tech-doc-qa/
 모든 API는 /api/v1/ prefix 사용
 
 # Backend API Spec
-POST   /api/v1/auth/signup        회원가입
-POST   /api/v1/auth/login         로그인 → JWT 발급
-POST   /api/v1/query              질문 → RAG 서버 위임 → 답변 반환
-GET    /api/v1/query/history      내 검색 이력 조회 (Cursor 기반 페이지네이션)
+
+| 메서드 | 경로 | 설명 | 상태코드 | 응답 body |
+|--------|------|------|----------|-----------|
+| POST | /api/v1/auth/signup | 회원가입 | 201 | `{"success": true, "message": "회원가입이 완료되었습니다"}` |
+| POST | /api/v1/auth/login | 로그인 → JWT 발급 | 200 | `{"success": true, "message": "로그인에 성공했습니다", "data": {"accessToken": "...", "refreshToken": "..."}}` |
+| POST | /api/v1/auth/refresh | 토큰 갱신 | 200 | `{"success": true, "message": "토큰이 갱신되었습니다", "data": {"accessToken": "...", "refreshToken": "..."}}` |
+| POST | /api/v1/auth/logout | 로그아웃 | 200 | `{"success": true, "message": "로그아웃되었습니다"}` |
+| POST | /api/v1/query | 질문 → RAG 서버 위임 → 답변 반환 | 200 | `{"success": true, "message": "답변이 생성되었습니다", "data": {"answer": "..."}}` |
+| GET | /api/v1/query/history | 내 검색 이력 조회 (Cursor 기반 페이지네이션) | 200 | `{"success": true, "message": "이력이 조회되었습니다", "data": {"items": [...], "nextCursor": "..."}}` |
 
 # DB Schema
 users       : id, email, password, created_at
