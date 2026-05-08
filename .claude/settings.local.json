@@ -22,7 +22,9 @@
       "Bash(docker compose *)",
       "Bash(git *)",
       "Bash(grep -h \"^description:\" .claude/agents/*.md)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)"
     ],
     "deny": [
       "Bash(git push --force*)",
