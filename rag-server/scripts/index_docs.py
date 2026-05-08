@@ -13,6 +13,7 @@ import time
 import requests
 from bs4 import BeautifulSoup
 from elasticsearch import Elasticsearch, helpers
+from sentence_transformers import SentenceTransformer
 
 ES_URL = os.getenv("ES_URL", "http://localhost:9200")
 INDEX = os.getenv("ES_INDEX", "tech-docs")
@@ -81,14 +82,22 @@ def fetch_chunks(title: str, url: str) -> list[dict]:
     return chunks
 
 
-def index_chunks(es: Elasticsearch, chunks: list[dict]) -> None:
+def index_chunks(es: Elasticsearch, chunks: list[dict], model: SentenceTransformer) -> None:
+    texts = [chunk["content"] for chunk in chunks]
+    embeddings = model.encode(texts, show_progress_bar=False, batch_size=32)
+
     actions = [
         {
             "_index": INDEX,
             "_id": chunk["_id"],
-            "_source": {"title": chunk["title"], "content": chunk["content"], "url": chunk["url"]},
+            "_source": {
+                "title": chunk["title"],
+                "content": chunk["content"],
+                "url": chunk["url"],
+                "embedding": embedding.tolist(),
+            },
         }
-        for chunk in chunks
+        for chunk, embedding in zip(chunks, embeddings)
     ]
     helpers.bulk(es, actions)
     print(f"  {len(chunks)}개 청크 색인 완료")
@@ -103,11 +112,15 @@ def main() -> None:
 
     setup_index(es)
 
+    print("임베딩 모델 로딩 중...")
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    print("모델 로딩 완료\n")
+
     for title, url in DOCS:
         print(f"크롤링: {title}")
         chunks = fetch_chunks(title, url)
         if chunks:
-            index_chunks(es, chunks)
+            index_chunks(es, chunks, model)
         time.sleep(0.5)
 
     print("\n색인 완료!")
