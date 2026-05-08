@@ -12,7 +12,7 @@ import time
 
 import requests
 from bs4 import BeautifulSoup
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, helpers
 
 ES_URL = os.getenv("ES_URL", "http://localhost:9200")
 INDEX = os.getenv("ES_INDEX", "tech-docs")
@@ -71,9 +71,15 @@ def fetch_chunks(title: str, url: str) -> list[dict]:
 
 
 def index_chunks(es: Elasticsearch, chunks: list[dict]) -> None:
-    for chunk in chunks:
-        doc_id = chunk.pop("_id")
-        es.index(index=INDEX, id=doc_id, document=chunk)
+    actions = [
+        {
+            "_index": INDEX,
+            "_id": chunk["_id"],
+            "_source": {"title": chunk["title"], "content": chunk["content"], "url": chunk["url"]},
+        }
+        for chunk in chunks
+    ]
+    helpers.bulk(es, actions)
     print(f"  {len(chunks)}개 청크 색인 완료")
 
 
