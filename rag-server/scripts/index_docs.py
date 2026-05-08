@@ -19,14 +19,25 @@ INDEX = os.getenv("ES_INDEX", "tech-docs")
 CHUNK_WORDS = 400
 
 DOCS = [
-    ("Spring Boot - Web (Servlet)",            "https://docs.spring.io/spring-boot/reference/web/servlet.html"),
-    ("Spring Boot - Security",                 "https://docs.spring.io/spring-boot/reference/web/spring-security.html"),
-    ("Spring Boot - Data (SQL)",               "https://docs.spring.io/spring-boot/reference/data/sql.html"),
-    ("Spring Boot - Testing",                  "https://docs.spring.io/spring-boot/reference/testing/index.html"),
-    ("Spring Boot - Actuator",                 "https://docs.spring.io/spring-boot/reference/actuator/index.html"),
-    ("Spring Boot - Logging",                  "https://docs.spring.io/spring-boot/reference/features/logging.html"),
-    ("Spring Boot - Externalized Config",      "https://docs.spring.io/spring-boot/reference/features/external-config.html"),
-    ("Spring Boot - Caching",                  "https://docs.spring.io/spring-boot/reference/io/caching.html"),
+    # Spring Boot
+    ("Spring Boot - Web (Servlet)",        "https://docs.spring.io/spring-boot/reference/web/servlet.html"),
+    ("Spring Boot - Security",             "https://docs.spring.io/spring-boot/reference/web/spring-security.html"),
+    ("Spring Boot - Data (SQL)",           "https://docs.spring.io/spring-boot/reference/data/sql.html"),
+    ("Spring Boot - Testing",              "https://docs.spring.io/spring-boot/reference/testing/index.html"),
+    ("Spring Boot - Actuator",             "https://docs.spring.io/spring-boot/reference/actuator/index.html"),
+    ("Spring Boot - Logging",              "https://docs.spring.io/spring-boot/reference/features/logging.html"),
+    ("Spring Boot - Externalized Config",  "https://docs.spring.io/spring-boot/reference/features/external-config.html"),
+    ("Spring Boot - Caching",              "https://docs.spring.io/spring-boot/reference/io/caching.html"),
+    # Spring Framework
+    ("Spring Framework - Core (IoC/DI)",   "https://docs.spring.io/spring-framework/reference/core/beans.html"),
+    ("Spring Framework - AOP",             "https://docs.spring.io/spring-framework/reference/core/aop.html"),
+    ("Spring Framework - Data Access",     "https://docs.spring.io/spring-framework/reference/data-access.html"),
+    ("Spring Framework - Web MVC",         "https://docs.spring.io/spring-framework/reference/web/webmvc.html"),
+    ("Spring Framework - Testing",         "https://docs.spring.io/spring-framework/reference/testing.html"),
+    # Spring Data JPA
+    ("Spring Data JPA",                    "https://docs.spring.io/spring-data/jpa/reference/jpa.html"),
+    # Spring Security
+    ("Spring Security - Servlet",          "https://docs.spring.io/spring-security/reference/servlet/index.html"),
 ]
 
 MAPPING = {
