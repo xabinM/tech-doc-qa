@@ -1,5 +1,34 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import anthropic
+from elasticsearch import exceptions as es_exc
+from client.es import ping
 from router.query import router
 
 app = FastAPI(title="RAG Server")
 app.include_router(router)
+
+
+@app.get("/health")
+async def health():
+    if not await ping():
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "detail": "Elasticsearch에 연결할 수 없습니다."},
+        )
+    return {"status": "ok"}
+
+
+@app.exception_handler(es_exc.TransportError)
+async def es_error_handler(request: Request, exc: es_exc.TransportError):
+    return JSONResponse(status_code=503, content={"detail": "Elasticsearch 오류가 발생했습니다."})
+
+
+@app.exception_handler(anthropic.APIError)
+async def anthropic_error_handler(request: Request, exc: anthropic.APIError):
+    return JSONResponse(status_code=503, content={"detail": "LLM API 오류가 발생했습니다."})
+
+
+@app.exception_handler(Exception)
+async def general_error_handler(request: Request, exc: Exception):
+    return JSONResponse(status_code=500, content={"detail": "서버 내부 오류가 발생했습니다."})

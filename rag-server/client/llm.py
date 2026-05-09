@@ -16,7 +16,11 @@ async def generate_answer(question: str, chunks: list[str]) -> str:
     message = await _client.messages.create(
         model=settings.claude_model,
         max_tokens=1024,
-        system=_SYSTEM_PROMPT,
+        system=[{
+            "type": "text",
+            "text": _SYSTEM_PROMPT,
+            "cache_control": {"type": "ephemeral"},
+        }],
         messages=[
             {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
         ],

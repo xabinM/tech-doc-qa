@@ -12,21 +12,33 @@ import time
 
 import requests
 from bs4 import BeautifulSoup
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, helpers
+from sentence_transformers import SentenceTransformer
 
 ES_URL = os.getenv("ES_URL", "http://localhost:9200")
 INDEX = os.getenv("ES_INDEX", "tech-docs")
 CHUNK_WORDS = 400
 
 DOCS = [
-    ("Spring Boot - Web (Servlet)",            "https://docs.spring.io/spring-boot/reference/web/servlet.html"),
-    ("Spring Boot - Security",                 "https://docs.spring.io/spring-boot/reference/web/spring-security.html"),
-    ("Spring Boot - Data (SQL)",               "https://docs.spring.io/spring-boot/reference/data/sql.html"),
-    ("Spring Boot - Testing",                  "https://docs.spring.io/spring-boot/reference/testing/index.html"),
-    ("Spring Boot - Actuator",                 "https://docs.spring.io/spring-boot/reference/actuator/index.html"),
-    ("Spring Boot - Logging",                  "https://docs.spring.io/spring-boot/reference/features/logging.html"),
-    ("Spring Boot - Externalized Config",      "https://docs.spring.io/spring-boot/reference/features/external-config.html"),
-    ("Spring Boot - Caching",                  "https://docs.spring.io/spring-boot/reference/io/caching.html"),
+    # Spring Boot
+    ("Spring Boot - Web (Servlet)",        "https://docs.spring.io/spring-boot/reference/web/servlet.html"),
+    ("Spring Boot - Security",             "https://docs.spring.io/spring-boot/reference/web/spring-security.html"),
+    ("Spring Boot - Data (SQL)",           "https://docs.spring.io/spring-boot/reference/data/sql.html"),
+    ("Spring Boot - Testing",              "https://docs.spring.io/spring-boot/reference/testing/index.html"),
+    ("Spring Boot - Actuator",             "https://docs.spring.io/spring-boot/reference/actuator/index.html"),
+    ("Spring Boot - Logging",              "https://docs.spring.io/spring-boot/reference/features/logging.html"),
+    ("Spring Boot - Externalized Config",  "https://docs.spring.io/spring-boot/reference/features/external-config.html"),
+    ("Spring Boot - Caching",              "https://docs.spring.io/spring-boot/reference/io/caching.html"),
+    # Spring Framework
+    ("Spring Framework - Core (IoC/DI)",   "https://docs.spring.io/spring-framework/reference/core/beans.html"),
+    ("Spring Framework - AOP",             "https://docs.spring.io/spring-framework/reference/core/aop.html"),
+    ("Spring Framework - Data Access",     "https://docs.spring.io/spring-framework/reference/data-access.html"),
+    ("Spring Framework - Web MVC",         "https://docs.spring.io/spring-framework/reference/web/webmvc.html"),
+    ("Spring Framework - Testing",         "https://docs.spring.io/spring-framework/reference/testing.html"),
+    # Spring Data JPA
+    ("Spring Data JPA",                    "https://docs.spring.io/spring-data/jpa/reference/jpa.html"),
+    # Spring Security
+    ("Spring Security - Servlet",          "https://docs.spring.io/spring-security/reference/servlet/index.html"),
 ]
 
 MAPPING = {
@@ -70,10 +82,24 @@ def fetch_chunks(title: str, url: str) -> list[dict]:
     return chunks
 
 
-def index_chunks(es: Elasticsearch, chunks: list[dict]) -> None:
-    for chunk in chunks:
-        doc_id = chunk.pop("_id")
-        es.index(index=INDEX, id=doc_id, document=chunk)
+def index_chunks(es: Elasticsearch, chunks: list[dict], model: SentenceTransformer) -> None:
+    texts = [chunk["content"] for chunk in chunks]
+    embeddings = model.encode(texts, show_progress_bar=False, batch_size=32)
+
+    actions = [
+        {
+            "_index": INDEX,
+            "_id": chunk["_id"],
+            "_source": {
+                "title": chunk["title"],
+                "content": chunk["content"],
+                "url": chunk["url"],
+                "embedding": embedding.tolist(),
+            },
+        }
+        for chunk, embedding in zip(chunks, embeddings)
+    ]
+    helpers.bulk(es, actions)
     print(f"  {len(chunks)}개 청크 색인 완료")
 
 
@@ -86,11 +112,15 @@ def main() -> None:
 
     setup_index(es)
 
+    print("임베딩 모델 로딩 중...")
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    print("모델 로딩 완료\n")
+
     for title, url in DOCS:
         print(f"크롤링: {title}")
         chunks = fetch_chunks(title, url)
         if chunks:
-            index_chunks(es, chunks)
+            index_chunks(es, chunks, model)
         time.sleep(0.5)
 
     print("\n색인 완료!")

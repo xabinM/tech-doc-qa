@@ -25,7 +25,7 @@ public class QueryController {
             @RequestBody @Valid QueryRequest request
     ) {
         String answer = queryService.query(userId, request.question());
-        return ApiResponse.ok(new QueryResponse(answer));
+        return ApiResponse.ok("답변이 생성되었습니다", new QueryResponse(answer));
     }
 
     @GetMapping("/history")
@@ -36,6 +36,6 @@ public class QueryController {
     ) {
         int pageSize = Math.min(size, DEFAULT_PAGE_SIZE);
         var logs = queryService.getHistory(userId, cursorId, pageSize);
-        return ApiResponse.ok(QueryHistoryResponse.of(logs, pageSize));
+        return ApiResponse.ok("이력이 조회되었습니다", QueryHistoryResponse.of(logs, pageSize));
     }
 }
