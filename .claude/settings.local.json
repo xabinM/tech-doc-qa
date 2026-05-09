@@ -22,7 +22,9 @@
       "Bash(docker compose *)",
       "Bash(git *)",
       "Bash(grep -h \"^description:\" .claude/agents/*.md)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(Get-ChildItem -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)"
     ],
     "deny": [
       "Bash(git push --force*)",
