@@ -6,8 +6,8 @@ RAG 처리는 Python FastAPI 서버에 위임한다.
 # Current Status
 - [x] auth 도메인 구현 (회원가입, 로그인, 토큰 갱신, 로그아웃)
 - [x] 테스트 코드 (AuthService 단위 테스트, AuthController 통합 테스트)
-- [ ] query 도메인 구현
-- [ ] RAG 서버 연동
+- [x] query 도메인 구현 (질의 처리, 이력 조회, Rate Limit)
+- [x] RAG 서버 연동 (RagClient, Circuit Breaker, 비동기 이력 저장)
 
 # Environment
 - Spring Boot: 3.5.x
@@ -61,7 +61,7 @@ query/     질의 처리, RAG 서버 연동, 검색 이력
 - `RagPort`             : RAG 서버 호출 포트 인터페이스
 - `JwtProvider`         : TokenManager 구현체
 - `RedisTokenRepository`: RefreshTokenStore 구현체
-- `RagClient`           : RagPort 구현체 (stub, RAG 서버 연동 예정)
+- `RagClient`           : RagPort 구현체 (WebClient + Circuit Breaker)
 
 # Backend-Specific Checks
 작업 시 아래를 반드시 확인한다.
