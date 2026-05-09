@@ -44,7 +44,7 @@ description: Python FastAPI 기반 RAG 서버 구현을 돕는다. Elasticsearch
 - 백엔드 Circuit Breaker가 감지할 수 있도록 503 반환
 
 ## 환경변수
-- `ES_HOST`, `ES_PORT`, `ANTHROPIC_API_KEY` 등 하드코딩 금지
+- `ES_URL`, `CLAUDE_API_KEY` 등 하드코딩 금지
 
 # 작업 시 확인사항
 1. 백엔드 `RagClient.java` 파일을 읽어 호출 스펙 파악
