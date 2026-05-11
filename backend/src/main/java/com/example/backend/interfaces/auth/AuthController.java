@@ -9,6 +9,7 @@ import com.example.backend.interfaces.auth.dto.AuthRefreshRequest;
 import com.example.backend.interfaces.auth.dto.AuthSignupRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,24 +27,24 @@ public class AuthController {
     @PostMapping("/signup")
     public ResponseEntity<ApiResponse<Void>> signup(@RequestBody @Valid AuthSignupRequest request) {
         authService.signup(request.email(), request.password());
-        return ResponseEntity.ok(ApiResponse.ok());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok("회원가입이 완료되었습니다"));
     }
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthLoginResponse>> login(@RequestBody @Valid AuthLoginRequest request) {
         TokenResult result = authService.login(request.email(), request.password());
-        return ResponseEntity.ok(ApiResponse.ok(AuthLoginResponse.from(result)));
+        return ResponseEntity.ok(ApiResponse.ok("로그인에 성공했습니다", AuthLoginResponse.from(result)));
     }
 
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<AuthLoginResponse>> refresh(@RequestBody @Valid AuthRefreshRequest request) {
         TokenResult result = authService.refresh(request.refreshToken());
-        return ResponseEntity.ok(ApiResponse.ok(AuthLoginResponse.from(result)));
+        return ResponseEntity.ok(ApiResponse.ok("토큰이 갱신되었습니다", AuthLoginResponse.from(result)));
     }
 
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(@AuthenticationPrincipal Long userId) {
         authService.logout(userId);
-        return ResponseEntity.ok(ApiResponse.ok());
+        return ResponseEntity.ok(ApiResponse.ok("로그아웃되었습니다"));
     }
 }

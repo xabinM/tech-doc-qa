@@ -25,6 +25,9 @@
       "Bash(grep:*)",
       "Skill(claude-api)",
       "Skill(claude-api:*)"
+      "Bash(Get-ChildItem -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(powershell.exe *)"
     ],
     "deny": [
       "Bash(git push --force*)",
