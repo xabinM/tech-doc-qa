@@ -34,4 +34,4 @@ async def search_docs(question: str) -> list[dict]:
             "_source": ["content", "url"],
         },
     )
-    return [hit["_source"] for hit in resp["hits"]["hits"]]
+    return [hit["_source"] for hit in resp.get("hits", {}).get("hits", [])]

@@ -99,8 +99,10 @@ def index_chunks(es: Elasticsearch, chunks: list[dict], model: SentenceTransform
         }
         for chunk, embedding in zip(chunks, embeddings)
     ]
-    helpers.bulk(es, actions)
-    print(f"  {len(chunks)}개 청크 색인 완료")
+    success, errors = helpers.bulk(es, actions, raise_on_error=False)
+    if errors:
+        print(f"  [경고] {len(errors)}개 문서 색인 실패")
+    print(f"  {success}개 청크 색인 완료")
 
 
 def main() -> None:

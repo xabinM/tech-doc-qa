@@ -11,8 +11,21 @@ _SYSTEM_PROMPT = (
 )
 
 
+_MAX_CONTEXT_CHARS = 8000
+
+
+def _trim_chunks(chunks: list[str]) -> list[str]:
+    selected, total = [], 0
+    for chunk in chunks:
+        if total + len(chunk) > _MAX_CONTEXT_CHARS:
+            break
+        selected.append(chunk)
+        total += len(chunk)
+    return selected or chunks[:1]
+
+
 async def generate_answer(question: str, chunks: list[str]) -> str:
-    context = "\n\n---\n\n".join(chunks)
+    context = "\n\n---\n\n".join(_trim_chunks(chunks))
     message = await _client.messages.create(
         model=settings.claude_model,
         max_tokens=1024,
