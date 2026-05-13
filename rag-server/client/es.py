@@ -1,3 +1,4 @@
+import asyncio
 from elasticsearch import AsyncElasticsearch
 from sentence_transformers import SentenceTransformer
 from config import settings
@@ -11,7 +12,8 @@ async def ping() -> bool:
 
 
 async def search_docs(question: str) -> list[dict]:
-    embedding = _model.encode(question).tolist()
+    embedding = await asyncio.get_running_loop().run_in_executor(None, _model.encode, question)
+    embedding = embedding.tolist()
 
     resp = await _es.search(
         index=settings.es_index,

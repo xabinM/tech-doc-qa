@@ -25,4 +25,6 @@ async def generate_answer(question: str, chunks: list[str]) -> str:
             {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
         ],
     )
+    if not message.content or message.content[0].type != "text":
+        raise ValueError("LLM이 텍스트 응답을 반환하지 않았습니다.")
     return message.content[0].text
