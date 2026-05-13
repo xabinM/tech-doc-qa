@@ -1,11 +1,20 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import anthropic
 from elasticsearch import exceptions as es_exc
-from client.es import ping
+from client.es import ping, load_model, close_es
 from router.query import router
 
-app = FastAPI(title="RAG Server")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await load_model()
+    yield
+    await close_es()
+
+
+app = FastAPI(title="RAG Server", lifespan=lifespan)
 app.include_router(router)
 
 
@@ -27,6 +36,11 @@ async def es_error_handler(request: Request, exc: es_exc.TransportError):
 @app.exception_handler(anthropic.APIError)
 async def anthropic_error_handler(request: Request, exc: anthropic.APIError):
     return JSONResponse(status_code=503, content={"detail": "LLM API 오류가 발생했습니다."})
+
+
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError):
+    return JSONResponse(status_code=502, content={"detail": str(exc)})
 
 
 @app.exception_handler(Exception)
