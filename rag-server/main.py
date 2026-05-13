@@ -1,14 +1,20 @@
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import anthropic
 from elasticsearch import exceptions as es_exc
 from client.es import ping, load_model, close_es
+from config import settings
 from router.query import router
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.internal_secret is None:
+        logger.warning("INTERNAL_SECRET이 설정되지 않았습니다. /ask 인증이 비활성화된 상태입니다.")
     await load_model()
     yield
     await close_es()
