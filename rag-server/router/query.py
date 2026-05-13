@@ -7,7 +7,7 @@ router = APIRouter()
 
 
 def _verify_secret(x_internal_secret: str = Header(default="")) -> None:
-    if settings.internal_secret and x_internal_secret != settings.internal_secret:
+    if settings.internal_secret is not None and x_internal_secret != settings.internal_secret:
         raise HTTPException(status_code=403)
 
 
