@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     claude_api_key: str
     claude_model: str = "claude-sonnet-4-6"
     search_size: int = 5
+    internal_secret: str = ""
 
     model_config = {"env_file": ".env"}
 
