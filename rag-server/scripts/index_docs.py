@@ -44,9 +44,10 @@ DOCS = [
 MAPPING = {
     "mappings": {
         "properties": {
-            "title":   {"type": "text"},
-            "content": {"type": "text"},
-            "url":     {"type": "keyword"},
+            "title":     {"type": "text"},
+            "content":   {"type": "text"},
+            "url":       {"type": "keyword"},
+            "embedding": {"type": "dense_vector", "dims": 384, "index": True, "similarity": "cosine"},
         }
     }
 }
