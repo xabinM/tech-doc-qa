@@ -35,7 +35,7 @@ async def generate_answer(question: str, chunks: list[str]) -> str:
             "cache_control": {"type": "ephemeral"},
         }],
         messages=[
-            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
+            {"role": "user", "content": f"<context>\n{context}\n</context>\n\n<question>\n{question}\n</question>"}
         ],
     )
     if not message.content or message.content[0].type != "text":
