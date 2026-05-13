@@ -44,6 +44,7 @@ async def search_docs(question: str) -> list[dict]:
                 "k": settings.search_size,
                 "num_candidates": settings.search_size * 10,
             },
+            "rank": {"rrf": {}},
             "size": settings.search_size,
             "_source": ["content", "url"],
         },
