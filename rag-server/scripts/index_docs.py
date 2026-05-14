@@ -6,7 +6,6 @@
 """
 
 import hashlib
-import os
 import sys
 import time
 
@@ -14,9 +13,10 @@ import requests
 from bs4 import BeautifulSoup
 from elasticsearch import Elasticsearch, helpers
 from sentence_transformers import SentenceTransformer
+from config import settings
 
-ES_URL = os.getenv("ES_URL", "http://localhost:9200")
-INDEX = os.getenv("ES_INDEX", "tech-docs")
+ES_URL = settings.es_url
+INDEX = settings.es_index
 CHUNK_WORDS = 400
 
 DOCS = [
