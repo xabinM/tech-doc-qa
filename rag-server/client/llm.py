@@ -1,7 +1,7 @@
 import anthropic
 from config import settings
 
-_client = anthropic.AsyncAnthropic(api_key=settings.claude_api_key)
+_client: anthropic.AsyncAnthropic | None = None
 
 _SYSTEM_PROMPT = (
     "You are a technical assistant specializing in Spring and Java documentation. "
@@ -10,8 +10,12 @@ _SYSTEM_PROMPT = (
     "Answer in the same language as the question."
 )
 
-
 _MAX_CONTEXT_CHARS = 8000
+
+
+def init_llm() -> None:
+    global _client
+    _client = anthropic.AsyncAnthropic(api_key=settings.claude_api_key)
 
 
 def _trim_chunks(chunks: list[str]) -> list[str]:
@@ -25,6 +29,8 @@ def _trim_chunks(chunks: list[str]) -> list[str]:
 
 
 async def generate_answer(question: str, chunks: list[str]) -> str:
+    if _client is None:
+        raise RuntimeError("LLM 클라이언트가 초기화되지 않았습니다.")
     context = "\n\n---\n\n".join(_trim_chunks(chunks))
     message = await _client.messages.create(
         model=settings.claude_model,

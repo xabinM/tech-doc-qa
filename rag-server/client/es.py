@@ -16,6 +16,7 @@ async def load_model() -> None:
 
 
 async def close_es() -> None:
+    _encoder_pool.shutdown(wait=False)
     await _es.close()
 
 
@@ -26,7 +27,10 @@ async def ping() -> bool:
 async def search_docs(question: str) -> list[dict]:
     if _model is None:
         raise RuntimeError("임베딩 모델이 초기화되지 않았습니다.")
-    embedding = await asyncio.get_running_loop().run_in_executor(_encoder_pool, _model.encode, question)
+    try:
+        embedding = await asyncio.get_running_loop().run_in_executor(_encoder_pool, _model.encode, question)
+    except Exception as e:
+        raise RuntimeError(f"임베딩 생성에 실패했습니다: {e}") from e
     embedding = embedding.tolist()
 
     resp = await _es.search(
