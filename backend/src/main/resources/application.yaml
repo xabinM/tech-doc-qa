@@ -37,6 +37,7 @@ rag:
     url: ${RAG_SERVER_URL:http://localhost:8000}
     connect-timeout-ms: 3000
     read-timeout-ms: 30000
+    internal-secret: ${RAG_INTERNAL_SECRET:}
 
 resilience4j:
   circuitbreaker:

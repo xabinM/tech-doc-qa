@@ -17,15 +17,21 @@ public class WebClientConfig {
     public WebClient ragWebClient(
             @Value("${rag.server.url}") String ragServerUrl,
             @Value("${rag.server.connect-timeout-ms}") int connectTimeoutMs,
-            @Value("${rag.server.read-timeout-ms}") int readTimeoutMs
+            @Value("${rag.server.read-timeout-ms}") int readTimeoutMs,
+            @Value("${rag.server.internal-secret:}") String internalSecret
     ) {
         HttpClient httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeoutMs)
                 .responseTimeout(Duration.ofMillis(readTimeoutMs));
 
-        return WebClient.builder()
+        WebClient.Builder builder = WebClient.builder()
                 .baseUrl(ragServerUrl)
-                .clientConnector(new ReactorClientHttpConnector(httpClient))
-                .build();
+                .clientConnector(new ReactorClientHttpConnector(httpClient));
+
+        if (!internalSecret.isBlank()) {
+            builder.defaultHeader("X-Internal-Secret", internalSecret);
+        }
+
+        return builder.build();
     }
 }
