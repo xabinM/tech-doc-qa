@@ -1,10 +1,12 @@
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 import anthropic
 from elasticsearch import exceptions as es_exc
 from client.es import ping, load_model, close_es
+from client.llm import init_llm
 from config import settings
 from router.query import router
 
@@ -15,6 +17,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     if settings.internal_secret is None:
         logger.warning("INTERNAL_SECRET이 설정되지 않았습니다. /ask 인증이 비활성화된 상태입니다.")
+    init_llm()
     await load_model()
     yield
     await close_es()
@@ -32,6 +35,11 @@ async def health():
             content={"status": "unhealthy", "detail": "Elasticsearch에 연결할 수 없습니다."},
         )
     return {"status": "ok"}
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(status_code=400, content={"detail": "잘못된 요청입니다."})
 
 
 @app.exception_handler(es_exc.TransportError)

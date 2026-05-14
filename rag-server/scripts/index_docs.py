@@ -6,7 +6,6 @@
 """
 
 import hashlib
-import os
 import sys
 import time
 
@@ -14,9 +13,10 @@ import requests
 from bs4 import BeautifulSoup
 from elasticsearch import Elasticsearch, helpers
 from sentence_transformers import SentenceTransformer
+from config import settings
 
-ES_URL = os.getenv("ES_URL", "http://localhost:9200")
-INDEX = os.getenv("ES_INDEX", "tech-docs")
+ES_URL = settings.es_url
+INDEX = settings.es_index
 CHUNK_WORDS = 400
 
 DOCS = [
@@ -56,6 +56,7 @@ MAPPING = {
 def setup_index(es: Elasticsearch) -> None:
     if es.indices.exists(index=INDEX):
         print(f"인덱스 '{INDEX}' 이미 존재합니다.")
+        print(f"  [주의] 매핑 변경(dense_vector dims 등)이 있으면 인덱스를 삭제 후 재실행하세요.")
         return
     es.indices.create(index=INDEX, body=MAPPING)
     print(f"인덱스 '{INDEX}' 생성 완료")

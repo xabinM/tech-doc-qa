@@ -103,19 +103,19 @@ class TestAskEndpoint(unittest.TestCase):
     # Edge cases: 요청 유효성 검사
     # ------------------------------------------------------------------
 
-    def test_question_빈문자열_422응답(self):
+    def test_question_빈문자열_400응답(self):
         # when
         response = self._post_ask("")
 
-        # then
-        self.assertEqual(422, response.status_code)
+        # then: RequestValidationError → 400 (api-response.md 규칙)
+        self.assertEqual(400, response.status_code)
 
-    def test_question_2001자초과_422응답(self):
+    def test_question_2001자초과_400응답(self):
         # given: 경계값 초과
         response = self._post_ask("가" * 2001)
 
         # then
-        self.assertEqual(422, response.status_code)
+        self.assertEqual(400, response.status_code)
 
     def test_question_정확히2000자_200응답(self):
         # given: 경계값 — 2000자는 허용
