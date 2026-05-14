@@ -4,9 +4,10 @@ backend/.gradle/
 backend/out/
 
 # Python
-rag-server/__pycache__/
+rag-server/**/__pycache__/
 rag-server/.venv/
-rag-server/*.pyc
+rag-server/**/*.pyc
+rag-server/.pytest_cache/
 
 # IDE
 .idea/
