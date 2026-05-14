@@ -10,6 +10,7 @@ _SYSTEM_PROMPT = (
     "Answer in the same language as the question."
 )
 
+# 청크 400단어 × 5개 ≈ 2000단어 ≈ ~2500토큰, 여유분 포함해 8000자로 제한
 _MAX_CONTEXT_CHARS = 8000
 
 
