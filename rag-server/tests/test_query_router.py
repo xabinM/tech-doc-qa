@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 os.environ.setdefault("ES_URL", "http://localhost:9200")
-os.environ.setdefault("CLAUDE_API_KEY", "test-key")
+os.environ.setdefault("GROQ_API_KEY", "test-key")
 
 # elasticsearch, sentence_transformers, anthropic이 설치되지 않은 환경에서도
 # 임포트가 성공하도록 sys.modules에 stub을 미리 주입한다.
@@ -16,7 +16,7 @@ os.environ.setdefault("CLAUDE_API_KEY", "test-key")
 # main.py의 @app.exception_handler()는 등록 시점에 issubclass() 검사를 하므로
 # APIError / TransportError는 반드시 실제 Exception 서브클래스여야 한다.
 
-class _FakeAnthropicAPIError(Exception):
+class _FakeGroqAPIError(Exception):
     pass
 
 class _FakeESTransportError(Exception):
@@ -26,10 +26,10 @@ class _FakeESTransportError(Exception):
 # APIError / TransportError는 반드시 실제 Exception 서브클래스여야 한다.
 # 다른 테스트 파일의 MagicMock stub이 먼저 등록돼도 반드시 올바른 클래스로
 # 교체해야 하므로 setdefault 대신 직접 할당한다.
-_anthropic_stub = MagicMock()
-_anthropic_stub.AsyncAnthropic = MagicMock(return_value=MagicMock())
-_anthropic_stub.APIError = _FakeAnthropicAPIError
-sys.modules["anthropic"] = _anthropic_stub
+_groq_stub = MagicMock()
+_groq_stub.AsyncGroq = MagicMock(return_value=MagicMock())
+_groq_stub.APIError = _FakeGroqAPIError
+sys.modules["groq"] = _groq_stub
 
 _es_exceptions_stub = MagicMock()
 _es_exceptions_stub.TransportError = _FakeESTransportError

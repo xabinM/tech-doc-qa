@@ -8,17 +8,18 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 os.environ.setdefault("ES_URL", "http://localhost:9200")
-os.environ.setdefault("CLAUDE_API_KEY", "test-key")
+os.environ.setdefault("GROQ_API_KEY", "test-key")
 
-# anthropic이 설치되지 않은 환경에서도 임포트가 성공하도록
+# groq이 설치되지 않은 환경에서도 임포트가 성공하도록
 # sys.modules에 stub을 미리 주입한다.
-_anthropic_stub = MagicMock()
-_anthropic_stub.AsyncAnthropic = MagicMock(return_value=MagicMock())
-sys.modules.setdefault("anthropic", _anthropic_stub)
+_groq_stub = MagicMock()
+_groq_stub.AsyncGroq = MagicMock(return_value=MagicMock())
+sys.modules.setdefault("groq", _groq_stub)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import asyncio
+import client.llm as llm_module
 from client.llm import _trim_chunks, generate_answer, _MAX_CONTEXT_CHARS
 
 
@@ -113,27 +114,26 @@ class TestTrimChunks(unittest.TestCase):
 class TestGenerateAnswer(unittest.TestCase):
 
     def _make_text_response(self, text: str):
-        """Anthropic 텍스트 응답 객체를 흉내 내는 MagicMock을 반환한다."""
-        content_block = MagicMock()
-        content_block.type = "text"
-        content_block.text = text
-        message = MagicMock()
-        message.content = [content_block]
-        return message
+        """Groq 텍스트 응답 객체를 흉내 내는 MagicMock을 반환한다."""
+        choice = MagicMock()
+        choice.message.content = text
+        response = MagicMock()
+        response.choices = [choice]
+        return response
 
-    def _make_non_text_response(self):
-        """type이 'text'가 아닌 응답 객체를 반환한다."""
-        content_block = MagicMock()
-        content_block.type = "tool_use"
-        message = MagicMock()
-        message.content = [content_block]
-        return message
+    def _make_empty_choices_response(self):
+        """choices가 빈 리스트인 응답 객체를 반환한다."""
+        response = MagicMock()
+        response.choices = []
+        return response
 
     def _make_empty_content_response(self):
-        """content가 빈 리스트인 응답 객체를 반환한다."""
-        message = MagicMock()
-        message.content = []
-        return message
+        """choices는 있지만 content가 빈 문자열인 응답 객체를 반환한다."""
+        choice = MagicMock()
+        choice.message.content = ""
+        response = MagicMock()
+        response.choices = [choice]
+        return response
 
     # ------------------------------------------------------------------
     # Happy path
@@ -144,8 +144,8 @@ class TestGenerateAnswer(unittest.TestCase):
         mock_response = self._make_text_response("Spring Boot는 자동 설정을 지원합니다.")
         mock_create = AsyncMock(return_value=mock_response)
 
-        with patch("client.llm._client") as mock_client:
-            mock_client.messages.create = mock_create
+        with patch.object(llm_module, "_client") as mock_client:
+            mock_client.chat.completions.create = mock_create
 
             # when
             result = run(generate_answer("Spring Boot란?", ["관련 내용"]))
@@ -158,52 +158,51 @@ class TestGenerateAnswer(unittest.TestCase):
         mock_response = self._make_text_response("답변")
         mock_create = AsyncMock(return_value=mock_response)
 
-        with patch("client.llm._client") as mock_client:
-            mock_client.messages.create = mock_create
+        with patch.object(llm_module, "_client") as mock_client:
+            mock_client.chat.completions.create = mock_create
 
             # when
             run(generate_answer("질문입니다.", ["청크 A", "청크 B"]))
 
-        # then: messages.create 호출 파라미터 검증
+        # then: chat.completions.create 호출 파라미터 검증
         call_kwargs = mock_create.call_args.kwargs
         from config import settings
-        self.assertEqual(settings.claude_model, call_kwargs["model"])
+        self.assertEqual(settings.groq_model, call_kwargs["model"])
         self.assertEqual(1024, call_kwargs["max_tokens"])
-        # system에 cache_control이 포함됐는지 확인
-        system_block = call_kwargs["system"][0]
-        self.assertEqual("text", system_block["type"])
-        self.assertIn("cache_control", system_block)
+        # system 메시지 확인
+        system_msg = call_kwargs["messages"][0]
+        self.assertEqual("system", system_msg["role"])
         # 사용자 메시지에 context와 question이 포함됐는지 확인
-        user_content = call_kwargs["messages"][0]["content"]
+        user_content = call_kwargs["messages"][1]["content"]
         self.assertIn("청크 A", user_content)
         self.assertIn("청크 B", user_content)
         self.assertIn("질문입니다.", user_content)
 
     # ------------------------------------------------------------------
-    # Edge case: 비텍스트 응답
+    # Edge case: 빈 응답
     # ------------------------------------------------------------------
 
-    def test_LLM비텍스트응답_ValueError발생(self):
-        # given
-        mock_response = self._make_non_text_response()
+    def test_LLM빈choices응답_ValueError발생(self):
+        # given: choices가 빈 리스트
+        mock_response = self._make_empty_choices_response()
         mock_create = AsyncMock(return_value=mock_response)
 
-        with patch("client.llm._client") as mock_client:
-            mock_client.messages.create = mock_create
+        with patch.object(llm_module, "_client") as mock_client:
+            mock_client.chat.completions.create = mock_create
 
             # when / then
             with self.assertRaises(ValueError) as ctx:
                 run(generate_answer("질문", ["내용"]))
 
-        self.assertIn("텍스트 응답", str(ctx.exception))
+        self.assertIn("응답", str(ctx.exception))
 
     def test_LLM빈content응답_ValueError발생(self):
-        # given
+        # given: content가 빈 문자열
         mock_response = self._make_empty_content_response()
         mock_create = AsyncMock(return_value=mock_response)
 
-        with patch("client.llm._client") as mock_client:
-            mock_client.messages.create = mock_create
+        with patch.object(llm_module, "_client") as mock_client:
+            mock_client.chat.completions.create = mock_create
 
             # when / then
             with self.assertRaises(ValueError):
@@ -220,15 +219,15 @@ class TestGenerateAnswer(unittest.TestCase):
         mock_response = self._make_text_response("답변")
         mock_create = AsyncMock(return_value=mock_response)
 
-        with patch("client.llm._client") as mock_client:
-            mock_client.messages.create = mock_create
+        with patch.object(llm_module, "_client") as mock_client:
+            mock_client.chat.completions.create = mock_create
 
             # when
             run(generate_answer("질문", [big_chunk_a, big_chunk_b]))
 
         # then: 두 번째 청크가 제외됐으므로 context에 'B'가 없어야 함
         call_kwargs = mock_create.call_args.kwargs
-        user_content = call_kwargs["messages"][0]["content"]
+        user_content = call_kwargs["messages"][1]["content"]
         self.assertIn("A" * 5000, user_content)
         self.assertNotIn("B" * 5000, user_content)
 
