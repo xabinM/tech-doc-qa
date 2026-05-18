@@ -41,6 +41,8 @@ async def generate_answer(question: str, chunks: list[str]) -> str:
             {"role": "user", "content": f"<context>\n{context}\n</context>\n\n<question>\n{question}\n</question>"}
         ]
     )
+    if not response.choices:
+        raise ValueError("LLM이 응답을 반환하지 않았습니다.")
     answer = response.choices[0].message.content
     if not answer:
         raise ValueError("LLM이 텍스트 응답을 반환하지 않았습니다.")

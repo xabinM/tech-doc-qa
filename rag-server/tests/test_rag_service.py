@@ -8,18 +8,19 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 os.environ.setdefault("ES_URL", "http://localhost:9200")
-os.environ.setdefault("CLAUDE_API_KEY", "test-key")
+os.environ.setdefault("GROQ_API_KEY", "test-key")
 
 sys.modules.setdefault("elasticsearch", MagicMock())
 sys.modules.setdefault("sentence_transformers", MagicMock())
+sys.modules.setdefault("groq", MagicMock())
 
 _es_stub = MagicMock()
 _es_stub.search_docs = AsyncMock(return_value=[])
 sys.modules["client.es"] = _es_stub
 
-_anthropic_stub = MagicMock()
-_anthropic_stub.AsyncAnthropic = MagicMock(return_value=MagicMock())
-sys.modules.setdefault("anthropic", _anthropic_stub)
+_llm_stub = MagicMock()
+_llm_stub.generate_answer = AsyncMock(return_value="")
+sys.modules["client.llm"] = _llm_stub
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -51,8 +52,8 @@ class TestRagAsk(unittest.TestCase):
         # given
         mock_gen = AsyncMock()
         with (
-            patch.object(rag_module, "search_docs", new=AsyncMock(return_value=[])),
-            patch.object(rag_module, "generate_answer", mock_gen),
+            patch.object(rag_module.es, "search_docs", new=AsyncMock(return_value=[])),
+            patch.object(rag_module.llm, "generate_answer", mock_gen),
         ):
             # when
             answer, sources = run(rag_module.ask("Spring이란?"))
@@ -74,8 +75,8 @@ class TestRagAsk(unittest.TestCase):
         ]
         mock_gen = AsyncMock()
         with (
-            patch.object(rag_module, "search_docs", new=AsyncMock(return_value=docs)),
-            patch.object(rag_module, "generate_answer", mock_gen),
+            patch.object(rag_module.es, "search_docs", new=AsyncMock(return_value=docs)),
+            patch.object(rag_module.llm, "generate_answer", mock_gen),
         ):
             # when
             answer, sources = run(rag_module.ask("질문"))
@@ -93,8 +94,8 @@ class TestRagAsk(unittest.TestCase):
         ]
         mock_gen = AsyncMock(return_value="생성된 답변")
         with (
-            patch.object(rag_module, "search_docs", new=AsyncMock(return_value=docs)),
-            patch.object(rag_module, "generate_answer", mock_gen),
+            patch.object(rag_module.es, "search_docs", new=AsyncMock(return_value=docs)),
+            patch.object(rag_module.llm, "generate_answer", mock_gen),
         ):
             # when
             answer, sources = run(rag_module.ask("질문"))
@@ -117,8 +118,8 @@ class TestRagAsk(unittest.TestCase):
         ]
         mock_gen = AsyncMock(return_value="답변")
         with (
-            patch.object(rag_module, "search_docs", new=AsyncMock(return_value=docs)),
-            patch.object(rag_module, "generate_answer", mock_gen),
+            patch.object(rag_module.es, "search_docs", new=AsyncMock(return_value=docs)),
+            patch.object(rag_module.llm, "generate_answer", mock_gen),
         ):
             # when
             answer, sources = run(rag_module.ask("질문"))
@@ -135,8 +136,8 @@ class TestRagAsk(unittest.TestCase):
         ]
         mock_gen = AsyncMock(return_value="답변")
         with (
-            patch.object(rag_module, "search_docs", new=AsyncMock(return_value=docs)),
-            patch.object(rag_module, "generate_answer", mock_gen),
+            patch.object(rag_module.es, "search_docs", new=AsyncMock(return_value=docs)),
+            patch.object(rag_module.llm, "generate_answer", mock_gen),
         ):
             # when
             _, sources = run(rag_module.ask("질문"))
@@ -156,8 +157,8 @@ class TestRagAsk(unittest.TestCase):
         ]
         mock_gen = AsyncMock(return_value="Spring Boot는 편리한 프레임워크입니다.")
         with (
-            patch.object(rag_module, "search_docs", new=AsyncMock(return_value=docs)),
-            patch.object(rag_module, "generate_answer", mock_gen),
+            patch.object(rag_module.es, "search_docs", new=AsyncMock(return_value=docs)),
+            patch.object(rag_module.llm, "generate_answer", mock_gen),
         ):
             # when
             answer, sources = run(rag_module.ask("Spring Boot란?"))
@@ -178,8 +179,8 @@ class TestRagAsk(unittest.TestCase):
         ]
         mock_gen = AsyncMock(return_value="답변")
         with (
-            patch.object(rag_module, "search_docs", new=AsyncMock(return_value=docs)),
-            patch.object(rag_module, "generate_answer", mock_gen),
+            patch.object(rag_module.es, "search_docs", new=AsyncMock(return_value=docs)),
+            patch.object(rag_module.llm, "generate_answer", mock_gen),
         ):
             # when
             _, sources = run(rag_module.ask("질문"))
