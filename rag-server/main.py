@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-import anthropic
+import groq
 from elasticsearch import exceptions as es_exc
 from client.es import ping, load_model, close_es
 from client.llm import init_llm
@@ -44,11 +44,13 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
 
 @app.exception_handler(es_exc.TransportError)
 async def es_error_handler(request: Request, exc: es_exc.TransportError):
+    logger.error(f"ES 오류: {exc}")
     return JSONResponse(status_code=503, content={"detail": "Elasticsearch 오류가 발생했습니다."})
 
 
-@app.exception_handler(anthropic.APIError)
-async def anthropic_error_handler(request: Request, exc: anthropic.APIError):
+@app.exception_handler(groq.APIError)
+async def llm_error_handler(request: Request, exc: groq.APIError):
+    logger.error(f"Groq API 오류: {exc}")
     return JSONResponse(status_code=503, content={"detail": "LLM API 오류가 발생했습니다."})
 
 

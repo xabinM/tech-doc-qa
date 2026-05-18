@@ -1,7 +1,7 @@
-import anthropic
+from groq import AsyncGroq
 from config import settings
 
-_client: anthropic.AsyncAnthropic | None = None
+_client: AsyncGroq | None = None
 
 _SYSTEM_PROMPT = (
     "You are a technical assistant specializing in Spring and Java documentation. "
@@ -16,7 +16,7 @@ _MAX_CONTEXT_CHARS = 8000
 
 def init_llm() -> None:
     global _client
-    _client = anthropic.AsyncAnthropic(api_key=settings.claude_api_key)
+    _client = AsyncGroq(api_key=settings.groq_api_key)
 
 
 def _trim_chunks(chunks: list[str]) -> list[str]:
@@ -33,18 +33,15 @@ async def generate_answer(question: str, chunks: list[str]) -> str:
     if _client is None:
         raise RuntimeError("LLM 클라이언트가 초기화되지 않았습니다.")
     context = "\n\n---\n\n".join(_trim_chunks(chunks))
-    message = await _client.messages.create(
-        model=settings.claude_model,
+    response = await _client.chat.completions.create(
+        model=settings.groq_model,
         max_tokens=1024,
-        system=[{
-            "type": "text",
-            "text": _SYSTEM_PROMPT,
-            "cache_control": {"type": "ephemeral"},
-        }],
         messages=[
+            {"role": "system", "content": _SYSTEM_PROMPT},
             {"role": "user", "content": f"<context>\n{context}\n</context>\n\n<question>\n{question}\n</question>"}
-        ],
+        ]
     )
-    if not message.content or message.content[0].type != "text":
+    answer = response.choices[0].message.content
+    if not answer:
         raise ValueError("LLM이 텍스트 응답을 반환하지 않았습니다.")
-    return message.content[0].text
+    return answer
