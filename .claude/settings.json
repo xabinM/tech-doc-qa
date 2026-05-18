@@ -1,4 +1,13 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(curl *)",
+      "Bash(docker logs *)",
+      "Bash(docker port *)",
+      "Bash(docker inspect *)",
+      "Bash(find /c/Users/vit/.claude/*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
