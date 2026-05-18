@@ -39,6 +39,13 @@ DOCS = [
     ("Spring Data JPA",                    "https://docs.spring.io/spring-data/jpa/reference/jpa.html"),
     # Spring Security
     ("Spring Security - Servlet",          "https://docs.spring.io/spring-security/reference/servlet/index.html"),
+    # Java
+    ("Java 21 - New Features Overview",    "https://openjdk.org/projects/jdk/21/"),
+    ("Java - Records (JEP 395)",           "https://openjdk.org/jeps/395"),
+    ("Java - Sealed Classes (JEP 409)",    "https://openjdk.org/jeps/409"),
+    ("Java - Pattern Matching (JEP 441)",  "https://openjdk.org/jeps/441"),
+    ("Java - Virtual Threads (JEP 444)",   "https://openjdk.org/jeps/444"),
+    ("Java - Sequenced Collections (JEP 431)", "https://openjdk.org/jeps/431"),
 ]
 
 MAPPING = {
