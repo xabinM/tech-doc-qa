@@ -1,71 +1,46 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git checkout *)",
-      "Bash(git add *)",
-      "Bash(git commit -m ' *)",
-      "Bash(git commit *)",
-      "Bash(git branch *)",
-      "Bash(git status)",
-      "Bash(git diff *)",
-      "Bash(git log *)",
-      "Bash(cd backend && ./gradlew test*)",
-      "Bash(cd backend && ./gradlew build*)",
-      "Bash(cd backend && ./gradlew compileJava*)",
-      "Bash(grep -rn * backend/src/)",
-      "Bash(find backend/src/ *)",
-      "Bash(chmod +x *)",
-      "Bash(Get-ChildItem -Recurse -Path \"C:\\\\root_project\" -Force)",
-      "Bash(Select-Object FullName)",
-      "Bash(Sort-Object FullName)",
-      "Bash(docker --version)",
-      "Bash(docker compose *)",
-      "Bash(git *)",
-      "Bash(grep -h \"^description:\" .claude/agents/*.md)",
-      "Bash(grep:*)",
+      "Bash(*)",
+      "Read(*)",
       "Skill(claude-api)",
-      "Skill(claude-api:*)"
-      "Bash(Get-ChildItem -Recurse -Directory)",
-      "Bash(Select-Object -ExpandProperty FullName)",
-      "Bash(powershell.exe *)"
+      "Skill(claude-api:*)",
+      "Bash(git add *)",
+      "Bash(git stash *)",
+      "Bash(git checkout *)"
     ],
     "deny": [
       "Bash(git push --force*)",
       "Bash(git push -f*)",
+      "Bash(rm -rf /)",
+      "Bash(rm -rf ~*)",
+      "Bash(git clean -fdx*)",
+      "Bash(docker system prune -a*)",
+      "Bash(shutdown*)",
+      "Bash(reboot*)"
+    ],
+    "ask": [
+      "Bash(git commit*)",
+      "Bash(git push*)",
       "Bash(git reset --hard*)",
       "Bash(git clean*)",
       "Bash(git branch -D*)",
-      "Bash(git checkout -- *)",
-      "Bash(git restore .)",
-      "Bash(git restore --staged .)",
+      "Bash(git rebase -i*)",
+      "Bash(git commit --amend*)",
+      "Bash(git push origin :*)",
       "Bash(rm -rf *)",
       "Bash(rm -f *)",
+      "Bash(truncate -s 0 *)",
+      "Bash(docker compose down -v*)",
       "Bash(docker-compose down -v*)",
-      "Bash(docker compose down -v*)"
-    ]
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .claude/hooks/pre-tool-check.sh"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .claude/hooks/post-tool-check.sh"
-          }
-        ]
-      }
+      "Bash(docker volume rm*)",
+      "Bash(docker volume prune*)",
+      "Bash(docker rm *)",
+      "Bash(docker rmi *)",
+      "Bash(chmod 777 *)",
+      "Bash(chmod -R 777 *)",
+      "Bash(git add *.env*)",
+      "Bash(git add .env*)"
     ]
   }
 }
