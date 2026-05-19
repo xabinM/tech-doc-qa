@@ -21,4 +21,7 @@ public interface QueryLogSpringDataJpaRepository extends JpaRepository<QueryLog,
             @Param("cursorId") Long cursorId,
             @Param("size") int size
     );
+
+    @Query("SELECT q FROM QueryLog q WHERE q.sessionId = :sessionId ORDER BY q.id ASC")
+    List<QueryLog> findBySessionId(@Param("sessionId") Long sessionId);
 }

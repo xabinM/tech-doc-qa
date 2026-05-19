@@ -18,6 +18,7 @@ public enum ErrorCode {
     // Query
     QUERY_RAG_SERVER_ERROR("QUERY_001", "답변 생성 중 오류가 발생했습니다", HttpStatus.SERVICE_UNAVAILABLE),
     QUERY_RATE_LIMIT_EXCEEDED("QUERY_002", "일일 요청 한도를 초과했습니다", HttpStatus.TOO_MANY_REQUESTS),
+    QUERY_SESSION_NOT_FOUND("QUERY_003", "존재하지 않는 채팅 세션입니다", HttpStatus.NOT_FOUND),
 
     // Common
     INVALID_INPUT("COMMON_001", "잘못된 요청입니다", HttpStatus.BAD_REQUEST),

@@ -7,4 +7,6 @@ public interface QueryLogRepository {
     QueryLog save(QueryLog queryLog);
 
     List<QueryLog> findByUserIdWithCursor(Long userId, Long cursorId, int size);
+
+    List<QueryLog> findBySessionId(Long sessionId);
 }

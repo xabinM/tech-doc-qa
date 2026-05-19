@@ -8,10 +8,10 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "query_logs")
+@Table(name = "chat_sessions")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class QueryLog {
+public class ChatSession {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -20,14 +20,8 @@ public class QueryLog {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "session_id")
-    private Long sessionId;
-
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String question;
-
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String answer;
+    @Column(nullable = false, length = 200)
+    private String title;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -37,12 +31,10 @@ public class QueryLog {
         this.createdAt = LocalDateTime.now();
     }
 
-    public static QueryLog create(Long userId, Long sessionId, String question, String answer) {
-        QueryLog log = new QueryLog();
-        log.userId = userId;
-        log.sessionId = sessionId;
-        log.question = question;
-        log.answer = answer;
-        return log;
+    public static ChatSession create(Long userId, String title) {
+        ChatSession session = new ChatSession();
+        session.userId = userId;
+        session.title = title;
+        return session;
     }
 }

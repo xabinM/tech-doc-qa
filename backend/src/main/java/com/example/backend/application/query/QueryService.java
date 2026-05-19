@@ -24,6 +24,7 @@ public class QueryService {
     private static final String RATE_LIMIT_PREFIX = "rate:";
 
     private final RagPort ragPort;
+    private final ChatSessionService chatSessionService;
     private final QueryLogRepository queryLogRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final StringRedisTemplate redisTemplate;
@@ -32,14 +33,17 @@ public class QueryService {
     private int dailyMax;
 
     // 트랜잭션 없음 - RAG 호출 중 DB 커넥션 점유 방지
-    public String query(Long userId, String question) {
+    // prepareSession에서 트랜잭션을 열고 커밋한 뒤 RAG 호출
+    public QueryResult query(Long userId, String question, Long sessionId) {
         checkRateLimit(userId);
 
-        String answer = ragPort.ask(question);
+        ChatSessionService.SessionContext ctx = chatSessionService.prepareSession(userId, question, sessionId);
 
-        eventPublisher.publishEvent(new QueryCompletedEvent(userId, question, answer));
+        String answer = ragPort.ask(question, ctx.history());
 
-        return answer;
+        eventPublisher.publishEvent(new QueryCompletedEvent(userId, question, answer, ctx.sessionId()));
+
+        return new QueryResult(answer, ctx.sessionId());
     }
 
     @Transactional(readOnly = true)
@@ -59,4 +63,6 @@ public class QueryService {
             throw new CustomException(ErrorCode.QUERY_RATE_LIMIT_EXCEEDED);
         }
     }
+
+    public record QueryResult(String answer, Long sessionId) {}
 }

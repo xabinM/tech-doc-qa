@@ -22,4 +22,9 @@ public class QueryLogJpaRepository implements QueryLogRepository {
     public List<QueryLog> findByUserIdWithCursor(Long userId, Long cursorId, int size) {
         return jpaRepository.findByUserIdWithCursor(userId, cursorId, size);
     }
+
+    @Override
+    public List<QueryLog> findBySessionId(Long sessionId) {
+        return jpaRepository.findBySessionId(sessionId);
+    }
 }
