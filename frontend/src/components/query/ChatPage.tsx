@@ -46,7 +46,8 @@ async function fetchSessionMessages(sessionId: number): Promise<Message[]> {
 
 export function ChatPage() {
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
-  const [messages, setMessages] = useState<Turn[]>([]);
+  // 방금 제출한 메시지 — 비동기 저장 지연 동안 즉시 표시용
+  const [pendingMessages, setPendingMessages] = useState<Turn[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
@@ -54,6 +55,19 @@ export function ChatPage() {
     queryKey: ['sessions'],
     queryFn: fetchSessions,
   });
+
+  // 선택된 세션의 메시지를 서버에서 로드 (세션 전환 시 자동 refetch)
+  const { data: loadedMessages } = useQuery({
+    queryKey: ['session-messages', currentSessionId],
+    queryFn: () => fetchSessionMessages(currentSessionId!),
+    enabled: currentSessionId !== null,
+  });
+
+  // 화면에 표시할 최종 메시지 = 서버 저장 메시지 + 즉시 표시 메시지
+  const displayMessages: Turn[] = [
+    ...(loadedMessages?.map((m) => ({ question: m.question, answer: m.answer })) ?? []),
+    ...pendingMessages,
+  ];
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -66,30 +80,25 @@ export function ChatPage() {
         setCurrentSessionId(data.sessionId);
         queryClient.invalidateQueries({ queryKey: ['sessions'] });
       }
-      setMessages((prev) => [...prev, { question: variables.question, answer: data.answer }]);
+      setPendingMessages((prev) => [...prev, { question: variables.question, answer: data.answer }]);
       reset();
     },
     onError: (e) => toast.error(e.message),
   });
 
-  const selectSession = useCallback(async (sessionId: number) => {
-    try {
-      const msgs = await fetchSessionMessages(sessionId);
-      setCurrentSessionId(sessionId);
-      setMessages(msgs.map((m) => ({ question: m.question, answer: m.answer })));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '대화 내역을 불러오지 못했습니다');
-    }
+  const selectSession = useCallback((sessionId: number) => {
+    setCurrentSessionId(sessionId);
+    setPendingMessages([]);
   }, []);
 
   const startNewChat = useCallback(() => {
     setCurrentSessionId(null);
-    setMessages([]);
+    setPendingMessages([]);
   }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, mutation.isPending]);
+  }, [displayMessages.length]);
 
   const submitQuestion = handleSubmit((v) => mutation.mutate(v));
 
@@ -131,7 +140,7 @@ export function ChatPage() {
 
         {/* 메시지 목록 */}
         <div className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
-          {messages.length === 0 && !mutation.isPending && (
+          {displayMessages.length === 0 && !mutation.isPending && (
             <div className="h-full flex flex-col items-center justify-center gap-2 text-center">
               <p className="text-base font-medium">무엇이 궁금하신가요?</p>
               <p className="text-sm text-muted-foreground">
@@ -140,8 +149,8 @@ export function ChatPage() {
             </div>
           )}
 
-          {messages.map((turn, i) => (
-            <div key={i} className="space-y-2.5">
+          {displayMessages.map((turn, i) => (
+            <div key={`${currentSessionId}-${i}`} className="space-y-2.5">
               <div className="flex justify-end">
                 <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[75%] text-sm">
                   {turn.question}
@@ -184,7 +193,7 @@ export function ChatPage() {
                 {...register('question')}
               />
               {errors.question && (
-                <p className="text-xs text-destructive mt-1">{errors.question.message}</p>
+                <p className="text-sm text-destructive mt-1">{errors.question.message}</p>
               )}
             </div>
             <Button type="submit" disabled={mutation.isPending} className="shrink-0 mb-0.5">
