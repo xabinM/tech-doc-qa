@@ -10,4 +10,8 @@ public interface ChatSessionRepository {
     Optional<ChatSession> findById(Long id);
 
     List<ChatSession> findByUserIdWithCursor(Long userId, Long cursorId, int size);
+
+    void deleteById(Long id);
+
+    void deleteByUserId(Long userId);
 }

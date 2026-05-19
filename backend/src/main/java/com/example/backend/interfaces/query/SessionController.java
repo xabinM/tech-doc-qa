@@ -39,4 +39,13 @@ public class SessionController {
         var messages = chatSessionService.getSessionMessages(userId, sessionId);
         return ApiResponse.ok("대화 내역이 조회되었습니다", SessionMessagesResponse.of(messages));
     }
+
+    @DeleteMapping("/{sessionId}")
+    public ApiResponse<Void> deleteSession(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long sessionId
+    ) {
+        chatSessionService.deleteSession(userId, sessionId);
+        return ApiResponse.ok("세션이 삭제되었습니다");
+    }
 }

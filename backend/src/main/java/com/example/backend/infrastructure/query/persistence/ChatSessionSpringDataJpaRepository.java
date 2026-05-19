@@ -2,6 +2,7 @@ package com.example.backend.infrastructure.query.persistence;
 
 import com.example.backend.domain.query.ChatSession;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -21,4 +22,8 @@ public interface ChatSessionSpringDataJpaRepository extends JpaRepository<ChatSe
             @Param("cursorId") Long cursorId,
             @Param("size") int size
     );
+
+    @Modifying
+    @Query("DELETE FROM ChatSession s WHERE s.userId = :userId")
+    void deleteByUserId(@Param("userId") Long userId);
 }

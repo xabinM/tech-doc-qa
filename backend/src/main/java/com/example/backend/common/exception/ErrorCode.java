@@ -22,6 +22,7 @@ public enum ErrorCode {
 
     // User
     USER_NOT_FOUND("USER_001", "존재하지 않는 사용자입니다", HttpStatus.NOT_FOUND),
+    AUTH_PASSWORD_MISMATCH("AUTH_006", "현재 비밀번호가 올바르지 않습니다", HttpStatus.UNAUTHORIZED),
 
     // Common
     INVALID_INPUT("COMMON_001", "잘못된 요청입니다", HttpStatus.BAD_REQUEST),

@@ -37,4 +37,8 @@ public class User {
         user.password = encodedPassword;
         return user;
     }
+
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
 }

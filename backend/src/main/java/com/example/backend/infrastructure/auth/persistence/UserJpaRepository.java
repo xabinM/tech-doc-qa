@@ -32,4 +32,9 @@ public class UserJpaRepository implements UserRepository {
     public Optional<User> findById(Long id) {
         return jpaRepository.findById(id);
     }
+
+    @Override
+    public void deleteById(Long id) {
+        jpaRepository.deleteById(id);
+    }
 }

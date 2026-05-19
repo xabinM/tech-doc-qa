@@ -28,4 +28,14 @@ public class ChatSessionJpaRepository implements ChatSessionRepository {
     public List<ChatSession> findByUserIdWithCursor(Long userId, Long cursorId, int size) {
         return jpaRepository.findByUserIdWithCursor(userId, cursorId, size);
     }
+
+    @Override
+    public void deleteById(Long id) {
+        jpaRepository.deleteById(id);
+    }
+
+    @Override
+    public void deleteByUserId(Long userId) {
+        jpaRepository.deleteByUserId(userId);
+    }
 }
