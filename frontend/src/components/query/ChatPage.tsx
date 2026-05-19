@@ -7,6 +7,7 @@ import { z } from 'zod/v4';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { MarkdownRenderer } from '@/components/query/MarkdownRenderer';
 
 type Turn = { question: string; answer: string };
 type Session = { id: number; title: string; createdAt: string };
@@ -103,7 +104,7 @@ export function ChatPage() {
   const submitQuestion = handleSubmit((v) => mutation.mutate(v));
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-full overflow-hidden">
       {/* 사이드바 */}
       <aside className="w-60 shrink-0 border-r flex flex-col bg-muted/30">
         <div className="p-3 border-b">
@@ -134,10 +135,6 @@ export function ChatPage() {
 
       {/* 메인 채팅 영역 */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="shrink-0 border-b px-5 h-12 flex items-center">
-          <h1 className="text-sm font-semibold">기술 문서 Q&amp;A</h1>
-        </header>
-
         {/* 메시지 목록 */}
         <div className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
           {displayMessages.length === 0 && !mutation.isPending && (
@@ -157,8 +154,8 @@ export function ChatPage() {
                 </div>
               </div>
               <div className="flex justify-start">
-                <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-[75%] text-sm whitespace-pre-wrap leading-relaxed">
-                  {turn.answer}
+                <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-[75%]">
+                  <MarkdownRenderer content={turn.answer} />
                 </div>
               </div>
             </div>
