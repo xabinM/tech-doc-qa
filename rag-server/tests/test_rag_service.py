@@ -169,6 +169,7 @@ class TestRagAsk(unittest.TestCase):
         mock_gen.assert_called_once_with(
             "Spring Boot란?",
             ["Spring Boot는 자동 설정을 제공합니다.", "Spring MVC는 웹 레이어를 담당합니다."],
+            [],
         )
 
     def test_url키없는doc_sources에_포함안됨(self):
@@ -187,6 +188,46 @@ class TestRagAsk(unittest.TestCase):
 
         # then: url 없는 doc은 sources에 포함되지 않음
         self.assertEqual(["https://spring.io/b"], sources)
+
+
+    # ------------------------------------------------------------------
+    # History 전달 검증
+    # ------------------------------------------------------------------
+
+    def test_history포함_LLM에history전달(self):
+        # given: 이전 대화 이력 포함
+        docs = [{"content": "Spring은 프레임워크입니다.", "url": "https://spring.io"}]
+        history = [{"question": "AOP란?", "answer": "관점 지향 프로그래밍입니다."}]
+        mock_gen = AsyncMock(return_value="추가 답변")
+        with (
+            patch.object(rag_module.es, "search_docs", new=AsyncMock(return_value=docs)),
+            patch.object(rag_module.llm, "generate_answer", mock_gen),
+        ):
+            # when
+            answer, _ = run(rag_module.ask("Spring이란?", history))
+
+        # then: history가 generate_answer에 전달되었는지 확인
+        mock_gen.assert_called_once_with(
+            "Spring이란?",
+            ["Spring은 프레임워크입니다."],
+            [{"question": "AOP란?", "answer": "관점 지향 프로그래밍입니다."}],
+        )
+        self.assertEqual("추가 답변", answer)
+
+    def test_history없음_빈리스트로LLM호출(self):
+        # given: history 미전달
+        docs = [{"content": "내용", "url": "https://spring.io"}]
+        mock_gen = AsyncMock(return_value="답변")
+        with (
+            patch.object(rag_module.es, "search_docs", new=AsyncMock(return_value=docs)),
+            patch.object(rag_module.llm, "generate_answer", mock_gen),
+        ):
+            # when
+            run(rag_module.ask("질문"))
+
+        # then: history 기본값 빈 리스트
+        _, _, passed_history = mock_gen.call_args[0]
+        self.assertEqual([], passed_history)
 
 
 if __name__ == "__main__":

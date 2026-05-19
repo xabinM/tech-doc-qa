@@ -29,17 +29,27 @@ def _trim_chunks(chunks: list[str]) -> list[str]:
     return selected or chunks[:1]
 
 
-async def generate_answer(question: str, chunks: list[str]) -> str:
+async def generate_answer(question: str, chunks: list[str], history: list[dict] | None = None) -> str:
     if _client is None:
         raise RuntimeError("LLM 클라이언트가 초기화되지 않았습니다.")
+
     context = "\n\n---\n\n".join(_trim_chunks(chunks))
+
+    messages: list[dict] = [{"role": "system", "content": _SYSTEM_PROMPT}]
+
+    for turn in (history or []):
+        messages.append({"role": "user", "content": turn["question"]})
+        messages.append({"role": "assistant", "content": turn["answer"]})
+
+    messages.append({
+        "role": "user",
+        "content": f"<context>\n{context}\n</context>\n\n<question>\n{question}\n</question>"
+    })
+
     response = await _client.chat.completions.create(
         model=settings.groq_model,
         max_tokens=1024,
-        messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": f"<context>\n{context}\n</context>\n\n<question>\n{question}\n</question>"}
-        ]
+        messages=messages
     )
     if not response.choices:
         raise ValueError("LLM이 응답을 반환하지 않았습니다.")
