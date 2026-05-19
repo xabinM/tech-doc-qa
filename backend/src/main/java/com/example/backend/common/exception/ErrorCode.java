@@ -20,6 +20,9 @@ public enum ErrorCode {
     QUERY_RATE_LIMIT_EXCEEDED("QUERY_002", "일일 요청 한도를 초과했습니다", HttpStatus.TOO_MANY_REQUESTS),
     QUERY_SESSION_NOT_FOUND("QUERY_003", "존재하지 않는 채팅 세션입니다", HttpStatus.NOT_FOUND),
 
+    // User
+    USER_NOT_FOUND("USER_001", "존재하지 않는 사용자입니다", HttpStatus.NOT_FOUND),
+
     // Common
     INVALID_INPUT("COMMON_001", "잘못된 요청입니다", HttpStatus.BAD_REQUEST),
     INTERNAL_SERVER_ERROR("COMMON_002", "서버 내부 오류가 발생했습니다", HttpStatus.INTERNAL_SERVER_ERROR);
