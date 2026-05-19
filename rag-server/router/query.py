@@ -11,8 +11,14 @@ def _verify_secret(x_internal_secret: str = Header(default="")) -> None:
         raise HTTPException(status_code=403)
 
 
+class HistoryItem(BaseModel):
+    question: str
+    answer: str
+
+
 class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
+    history: list[HistoryItem] = []
 
 
 class AskResponse(BaseModel):
@@ -22,5 +28,6 @@ class AskResponse(BaseModel):
 
 @router.post("/ask", response_model=AskResponse, dependencies=[Depends(_verify_secret)])
 async def ask(request: AskRequest) -> AskResponse:
-    answer, sources = await rag.ask(request.question)
+    history = [{"question": h.question, "answer": h.answer} for h in request.history]
+    answer, sources = await rag.ask(request.question, history)
     return AskResponse(answer=answer, sources=sources)
