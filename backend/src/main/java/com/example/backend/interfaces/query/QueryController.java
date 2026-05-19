@@ -24,8 +24,8 @@ public class QueryController {
             @AuthenticationPrincipal Long userId,
             @RequestBody @Valid QueryRequest request
     ) {
-        String answer = queryService.query(userId, request.question());
-        return ApiResponse.ok("답변이 생성되었습니다", new QueryResponse(answer));
+        QueryService.QueryResult result = queryService.query(userId, request.question(), request.sessionId());
+        return ApiResponse.ok("답변이 생성되었습니다", new QueryResponse(result.answer(), result.sessionId()));
     }
 
     @GetMapping("/history")

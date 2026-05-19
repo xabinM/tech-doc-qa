@@ -1,4 +1,4 @@
 package com.example.backend.interfaces.query.dto;
 
-public record QueryResponse(String answer) {
+public record QueryResponse(String answer, Long sessionId) {
 }

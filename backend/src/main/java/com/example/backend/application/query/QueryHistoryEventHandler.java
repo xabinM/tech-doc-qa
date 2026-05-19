@@ -22,7 +22,7 @@ public class QueryHistoryEventHandler {
     @Transactional
     public void handleQueryCompleted(QueryCompletedEvent event) {
         try {
-            QueryLog queryLog = QueryLog.create(event.userId(), event.question(), event.answer());
+            QueryLog queryLog = QueryLog.create(event.userId(), event.sessionId(), event.question(), event.answer());
             queryLogRepository.save(queryLog);
         } catch (Exception e) {
             log.error("검색 이력 저장 실패 - userId={}, error={}", event.userId(), e.getMessage(), e);
