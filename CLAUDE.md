@@ -8,7 +8,7 @@ LLM이 해당 문서를 컨텍스트로 답변을 생성한다.
 tech-doc-qa/
   backend/      Spring Boot (Java 21) - API 서버, 인증, 이력 관리
   rag-server/   Python FastAPI - ES 검색, LLM API 연동, 답변 생성
-  frontend/     추후 추가
+  frontend/     Next.js 16 (App Router) - BFF 패턴, httpOnly 쿠키 인증
   elasticsearch/ 인덱스 매핑, 설정 파일
   docs/         설계 문서
 

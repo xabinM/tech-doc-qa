@@ -9,13 +9,14 @@
 
 **브랜치 네이밍 규칙:** `{type}/{service}/{feature}`
 - type: feat / fix / refactor / chore
-- service: backend / rag / infra
-- 예시: feat/backend-query, fix/backend-jwt, chore/ci-setup
+- service: backend / rag / frontend / infra
+- 예시: feat/backend-query, fix/backend-jwt, feat/frontend-auth, chore/ci-setup
 
 **브랜치 추론 기준 (변경된 파일 경로 기준):**
 - `backend/` 하위 auth 관련 → `feat/backend-auth` 계열
 - `backend/` 하위 query 관련 → `feat/backend-query` 계열
 - `rag-server/` 하위 → `feat/rag-{feature}` 계열
+- `frontend/` 하위 → `feat/frontend-{feature}` 계열 (예: `feat/frontend-auth`, `feat/frontend-query`)
 - `elasticsearch/` 또는 인프라 설정 → `chore/infra-{feature}` 계열
 - 여러 서비스에 걸친 변경 → 경고 후 사용자에게 확인
 
@@ -66,6 +67,7 @@
 - `backend/` auth 관련 파일 → 1개 커밋
 - `backend/` query 관련 파일 → 1개 커밋
 - `rag-server/` 파일 → 1개 커밋
+- `frontend/` 파일 → 1개 커밋 (기능 단위로 추가 분리 가능)
 - `elasticsearch/`, `docker-compose.yml`, `.env.example` 등 인프라 파일 → 1개 커밋
 - `.claude/` 파일 → 1개 커밋
 - 위 기준으로 묶이지 않는 파일은 가장 유사한 그룹에 포함하거나 별도 그룹으로 분리
