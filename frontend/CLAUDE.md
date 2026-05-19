@@ -6,7 +6,7 @@ Spring Boot 백엔드와 BFF 패턴으로 통신하며, JWT 토큰을 httpOnly �
 
 # Current Status
 - [x] 인증 (로그인 / 회원가입 / 로그아웃 / 토큰 갱신)
-- [ ] 질문 입력 & 답변 표시
+- [x] 질문 입력 & 답변 표시 (멀티턴 채팅 UI, 사이드바 이력)
 - [ ] 검색 이력 조회
 
 # Environment
