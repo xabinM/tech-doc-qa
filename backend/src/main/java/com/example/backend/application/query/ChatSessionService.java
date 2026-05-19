@@ -64,5 +64,22 @@ public class ChatSessionService {
         return queryLogRepository.findBySessionId(sessionId);
     }
 
+    @Transactional
+    public void deleteSession(Long userId, Long sessionId) {
+        ChatSession session = chatSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.QUERY_SESSION_NOT_FOUND));
+        if (!session.getUserId().equals(userId)) {
+            throw new CustomException(ErrorCode.AUTH_FORBIDDEN);
+        }
+        queryLogRepository.deleteBySessionId(sessionId);
+        chatSessionRepository.deleteById(sessionId);
+    }
+
+    @Transactional
+    public void deleteUserData(Long userId) {
+        queryLogRepository.deleteByUserId(userId);
+        chatSessionRepository.deleteByUserId(userId);
+    }
+
     public record SessionContext(Long sessionId, List<ConversationTurn> history) {}
 }

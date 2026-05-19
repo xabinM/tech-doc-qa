@@ -11,4 +11,8 @@ public interface QueryLogRepository {
     List<QueryLog> findBySessionId(Long sessionId);
 
     List<QueryLog> findLatestBySessionId(Long sessionId, int limit);
+
+    void deleteBySessionId(Long sessionId);
+
+    void deleteByUserId(Long userId);
 }

@@ -32,4 +32,14 @@ public class QueryLogJpaRepository implements QueryLogRepository {
     public List<QueryLog> findLatestBySessionId(Long sessionId, int limit) {
         return jpaRepository.findLatestBySessionId(sessionId, limit);
     }
+
+    @Override
+    public void deleteBySessionId(Long sessionId) {
+        jpaRepository.deleteBySessionId(sessionId);
+    }
+
+    @Override
+    public void deleteByUserId(Long userId) {
+        jpaRepository.deleteByUserId(userId);
+    }
 }

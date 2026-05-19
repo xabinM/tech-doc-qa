@@ -2,6 +2,7 @@ package com.example.backend.application.auth;
 
 import com.example.backend.application.auth.port.RefreshTokenStore;
 import com.example.backend.application.auth.port.TokenManager;
+import com.example.backend.application.query.ChatSessionService;
 import com.example.backend.common.exception.CustomException;
 import com.example.backend.common.exception.ErrorCode;
 import com.example.backend.domain.auth.User;
@@ -20,6 +21,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final TokenManager tokenManager;
     private final RefreshTokenStore refreshTokenStore;
+    private final ChatSessionService chatSessionService;
 
     @Transactional
     public void signup(String email, String password) {
@@ -46,7 +48,7 @@ public class AuthService {
     }
 
     public TokenResult refresh(String refreshToken) {
-        tokenManager.validateRefreshToken(refreshToken); // 만료: AUTH_TOKEN_EXPIRED, 위변조: AUTH_TOKEN_INVALID
+        tokenManager.validateRefreshToken(refreshToken);
 
         Long userId = tokenManager.getUserId(refreshToken);
         String stored = refreshTokenStore.get(userId)
@@ -70,5 +72,27 @@ public class AuthService {
     public User getUserProfile(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+    }
+
+    @Transactional
+    public void changePassword(Long userId, String currentPassword, String newPassword) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new CustomException(ErrorCode.AUTH_PASSWORD_MISMATCH);
+        }
+        user.changePassword(passwordEncoder.encode(newPassword));
+    }
+
+    @Transactional
+    public void deleteAccount(Long userId, String password) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new CustomException(ErrorCode.AUTH_PASSWORD_MISMATCH);
+        }
+        chatSessionService.deleteUserData(userId);
+        refreshTokenStore.delete(userId);
+        userRepository.deleteById(userId);
     }
 }

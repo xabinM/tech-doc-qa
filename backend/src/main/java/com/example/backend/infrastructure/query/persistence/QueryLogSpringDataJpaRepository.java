@@ -2,6 +2,7 @@ package com.example.backend.infrastructure.query.persistence;
 
 import com.example.backend.domain.query.QueryLog;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -27,4 +28,12 @@ public interface QueryLogSpringDataJpaRepository extends JpaRepository<QueryLog,
 
     @Query("SELECT q FROM QueryLog q WHERE q.sessionId = :sessionId ORDER BY q.id DESC LIMIT :limit")
     List<QueryLog> findLatestBySessionId(@Param("sessionId") Long sessionId, @Param("limit") int limit);
+
+    @Modifying
+    @Query("DELETE FROM QueryLog q WHERE q.sessionId = :sessionId")
+    void deleteBySessionId(@Param("sessionId") Long sessionId);
+
+    @Modifying
+    @Query("DELETE FROM QueryLog q WHERE q.userId = :userId")
+    void deleteByUserId(@Param("userId") Long userId);
 }
