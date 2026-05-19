@@ -27,4 +27,9 @@ public class UserJpaRepository implements UserRepository {
     public Optional<User> findByEmail(String email) {
         return jpaRepository.findByEmail(email);
     }
+
+    @Override
+    public Optional<User> findById(Long id) {
+        return jpaRepository.findById(id);
+    }
 }
