@@ -56,15 +56,32 @@ class QueryControllerTest {
     @WithMockUser
     @DisplayName("질의 성공 시 200 OK와 답변 반환")
     void query_success() throws Exception {
-        given(queryService.query(any(), anyString())).willReturn("Spring은 자바 프레임워크입니다.");
+        given(queryService.query(any(), anyString(), any()))
+                .willReturn(new QueryService.QueryResult("Spring은 자바 프레임워크입니다.", 1L));
 
         mockMvc.perform(post("/api/v1/query")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new QueryRequest("Spring이란?"))))
+                        .content(objectMapper.writeValueAsString(new QueryRequest("Spring이란?", null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.answer").value("Spring은 자바 프레임워크입니다."));
+                .andExpect(jsonPath("$.data.answer").value("Spring은 자바 프레임워크입니다."))
+                .andExpect(jsonPath("$.data.sessionId").value(1));
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("기존 세션에 이어서 질의 시 sessionId 포함 요청 처리")
+    void query_withExistingSession() throws Exception {
+        given(queryService.query(any(), anyString(), any()))
+                .willReturn(new QueryService.QueryResult("답변입니다.", 5L));
+
+        mockMvc.perform(post("/api/v1/query")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new QueryRequest("추가 질문", 5L))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sessionId").value(5));
     }
 
     @Test
@@ -74,7 +91,7 @@ class QueryControllerTest {
         mockMvc.perform(post("/api/v1/query")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new QueryRequest(""))))
+                        .content(objectMapper.writeValueAsString(new QueryRequest("", null))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("COMMON_001"));
     }
@@ -84,12 +101,12 @@ class QueryControllerTest {
     @DisplayName("일일 요청 한도 초과 시 429 Too Many Requests 반환")
     void query_rateLimitExceeded() throws Exception {
         willThrow(new CustomException(ErrorCode.QUERY_RATE_LIMIT_EXCEEDED))
-                .given(queryService).query(any(), anyString());
+                .given(queryService).query(any(), anyString(), any());
 
         mockMvc.perform(post("/api/v1/query")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new QueryRequest("Spring이란?"))))
+                        .content(objectMapper.writeValueAsString(new QueryRequest("Spring이란?", null))))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.error.code").value("QUERY_002"));
     }
@@ -100,7 +117,7 @@ class QueryControllerTest {
         mockMvc.perform(post("/api/v1/query")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new QueryRequest("Spring이란?"))))
+                        .content(objectMapper.writeValueAsString(new QueryRequest("Spring이란?", null))))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -108,7 +125,7 @@ class QueryControllerTest {
     @WithMockUser
     @DisplayName("검색 이력 조회 성공 - 첫 페이지")
     void history_success() throws Exception {
-        QueryLog log = QueryLog.create(1L, "Spring이란?", "Spring은 자바 프레임워크입니다.");
+        QueryLog log = QueryLog.create(1L, null, "Spring이란?", "Spring은 자바 프레임워크입니다.");
         given(queryService.getHistory(any(), isNull(), anyInt())).willReturn(List.of(log));
 
         mockMvc.perform(get("/api/v1/query/history").with(csrf()))

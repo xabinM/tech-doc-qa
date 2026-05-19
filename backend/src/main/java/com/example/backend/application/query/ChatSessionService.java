@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -17,6 +18,7 @@ import java.util.List;
 public class ChatSessionService {
 
     private static final int TITLE_MAX_LENGTH = 100;
+    private static final int HISTORY_CONTEXT_MAX = 20;
 
     private final ChatSessionRepository chatSessionRepository;
     private final QueryLogRepository queryLogRepository;
@@ -38,7 +40,9 @@ public class ChatSessionService {
             throw new CustomException(ErrorCode.AUTH_FORBIDDEN);
         }
 
-        List<ConversationTurn> history = queryLogRepository.findBySessionId(session.getId()).stream()
+        List<QueryLog> recentLogs = queryLogRepository.findLatestBySessionId(session.getId(), HISTORY_CONTEXT_MAX);
+        Collections.reverse(recentLogs);
+        List<ConversationTurn> history = recentLogs.stream()
                 .map(log -> new ConversationTurn(log.getQuestion(), log.getAnswer()))
                 .toList();
 

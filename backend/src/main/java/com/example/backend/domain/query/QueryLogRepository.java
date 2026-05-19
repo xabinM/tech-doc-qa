@@ -9,4 +9,6 @@ public interface QueryLogRepository {
     List<QueryLog> findByUserIdWithCursor(Long userId, Long cursorId, int size);
 
     List<QueryLog> findBySessionId(Long sessionId);
+
+    List<QueryLog> findLatestBySessionId(Long sessionId, int limit);
 }

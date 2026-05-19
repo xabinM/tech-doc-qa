@@ -25,6 +25,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -37,6 +38,9 @@ class QueryServiceTest {
 
     @Mock
     RagPort ragPort;
+
+    @Mock
+    ChatSessionService chatSessionService;
 
     @Mock
     QueryLogRepository queryLogRepository;
@@ -61,17 +65,21 @@ class QueryServiceTest {
         String rateKey = "rate:1:" + LocalDate.now();
         given(redisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.increment(rateKey)).willReturn(1L);
-        given(ragPort.ask("Spring이란?")).willReturn("Spring은 자바 프레임워크입니다.");
+        given(chatSessionService.prepareSession(eq(1L), eq("Spring이란?"), eq(null)))
+                .willReturn(new ChatSessionService.SessionContext(100L, List.of()));
+        given(ragPort.ask(eq("Spring이란?"), anyList())).willReturn("Spring은 자바 프레임워크입니다.");
 
-        String answer = queryService.query(1L, "Spring이란?");
+        QueryService.QueryResult result = queryService.query(1L, "Spring이란?", null);
 
-        assertThat(answer).isEqualTo("Spring은 자바 프레임워크입니다.");
+        assertThat(result.answer()).isEqualTo("Spring은 자바 프레임워크입니다.");
+        assertThat(result.sessionId()).isEqualTo(100L);
 
         ArgumentCaptor<QueryCompletedEvent> captor = ArgumentCaptor.forClass(QueryCompletedEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
         assertThat(captor.getValue().userId()).isEqualTo(1L);
         assertThat(captor.getValue().question()).isEqualTo("Spring이란?");
         assertThat(captor.getValue().answer()).isEqualTo("Spring은 자바 프레임워크입니다.");
+        assertThat(captor.getValue().sessionId()).isEqualTo(100L);
     }
 
     @Test
@@ -81,7 +89,7 @@ class QueryServiceTest {
         given(redisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.increment(rateKey)).willReturn(21L);
 
-        assertThatThrownBy(() -> queryService.query(1L, "Spring이란?"))
+        assertThatThrownBy(() -> queryService.query(1L, "Spring이란?", null))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                         .isEqualTo(ErrorCode.QUERY_RATE_LIMIT_EXCEEDED));
@@ -90,8 +98,8 @@ class QueryServiceTest {
     @Test
     @DisplayName("검색 이력 조회 - cursor 없으면 첫 페이지 반환")
     void getHistory_firstPage() {
-        QueryLog log1 = QueryLog.create(1L, "질문1", "답변1");
-        QueryLog log2 = QueryLog.create(1L, "질문2", "답변2");
+        QueryLog log1 = QueryLog.create(1L, null, "질문1", "답변1");
+        QueryLog log2 = QueryLog.create(1L, null, "질문2", "답변2");
         given(queryLogRepository.findByUserIdWithCursor(1L, null, 20))
                 .willReturn(List.of(log1, log2));
 
@@ -103,7 +111,7 @@ class QueryServiceTest {
     @Test
     @DisplayName("검색 이력 조회 - cursorId 기준으로 이전 데이터 반환")
     void getHistory_withCursor() {
-        QueryLog log = QueryLog.create(1L, "질문", "답변");
+        QueryLog log = QueryLog.create(1L, null, "질문", "답변");
         given(queryLogRepository.findByUserIdWithCursor(1L, 50L, 20))
                 .willReturn(List.of(log));
 

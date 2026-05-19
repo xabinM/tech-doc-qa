@@ -27,4 +27,9 @@ public class QueryLogJpaRepository implements QueryLogRepository {
     public List<QueryLog> findBySessionId(Long sessionId) {
         return jpaRepository.findBySessionId(sessionId);
     }
+
+    @Override
+    public List<QueryLog> findLatestBySessionId(Long sessionId, int limit) {
+        return jpaRepository.findLatestBySessionId(sessionId, limit);
+    }
 }

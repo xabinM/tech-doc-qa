@@ -4,10 +4,13 @@ import com.example.backend.application.query.ChatSessionService;
 import com.example.backend.common.response.ApiResponse;
 import com.example.backend.interfaces.query.dto.SessionListResponse;
 import com.example.backend.interfaces.query.dto.SessionMessagesResponse;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+@Validated
 @RestController
 @RequestMapping("/api/v1/sessions")
 @RequiredArgsConstructor
@@ -21,7 +24,7 @@ public class SessionController {
     public ApiResponse<SessionListResponse> listSessions(
             @AuthenticationPrincipal Long userId,
             @RequestParam(required = false) Long cursorId,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") @Min(1) int size
     ) {
         int pageSize = Math.min(size, DEFAULT_PAGE_SIZE);
         var sessions = chatSessionService.listSessions(userId, cursorId, pageSize);
