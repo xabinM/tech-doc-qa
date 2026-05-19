@@ -12,13 +12,13 @@ def _verify_secret(x_internal_secret: str = Header(default="")) -> None:
 
 
 class HistoryItem(BaseModel):
-    question: str
-    answer: str
+    question: str = Field(max_length=1000)
+    answer: str = Field(max_length=5000)
 
 
 class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
-    history: list[HistoryItem] = []
+    history: list[HistoryItem] = Field(default=[], max_length=10)
 
 
 class AskResponse(BaseModel):

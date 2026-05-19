@@ -187,6 +187,46 @@ class TestAskEndpoint(unittest.TestCase):
         # then
         self.assertEqual(200, response.status_code)
 
+    # ------------------------------------------------------------------
+    # History 검증
+    # ------------------------------------------------------------------
+
+    def test_history포함요청_200응답(self):
+        # given: 이전 대화 이력 포함 요청
+        mock_answer = ("멀티턴 답변", [])
+        history = [{"question": "AOP란?", "answer": "관점 지향 프로그래밍입니다."}]
+        with patch("router.query.rag.ask", new=AsyncMock(return_value=mock_answer)):
+            response = self.client.post(
+                "/ask",
+                json={"question": "Spring이란?", "history": history},
+            )
+
+        # then
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("멀티턴 답변", response.json()["answer"])
+
+    def test_history_10개초과_400응답(self):
+        # given: history 항목 11개 (max_length=10 초과)
+        history = [{"question": f"질문{i}", "answer": f"답변{i}"} for i in range(11)]
+        response = self.client.post(
+            "/ask",
+            json={"question": "Spring이란?", "history": history},
+        )
+
+        # then
+        self.assertEqual(400, response.status_code)
+
+    def test_history_answer_5001자초과_400응답(self):
+        # given: HistoryItem.answer 길이 초과
+        history = [{"question": "질문", "answer": "A" * 5001}]
+        response = self.client.post(
+            "/ask",
+            json={"question": "Spring이란?", "history": history},
+        )
+
+        # then
+        self.assertEqual(400, response.status_code)
+
 
 if __name__ == "__main__":
     unittest.main()
