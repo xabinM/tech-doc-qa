@@ -9,7 +9,7 @@ export async function POST() {
     await backendFetch('/api/v1/auth/logout', { method: 'POST', token });
   } catch (e) {
     if (!(e instanceof ApiError)) {
-      console.error('로그아웃 백엔드 호출 실패:', e);
+      console.error('로그아웃 백엔드 호출 실패:', e instanceof Error ? e.message : e);
     }
     // 백엔드 실패와 무관하게 쿠키는 항상 삭제
   } finally {

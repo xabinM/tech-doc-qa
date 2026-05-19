@@ -1,14 +1,10 @@
-'use client';
-
-import { useEffect } from 'react';
-import { useAuthStore } from '@/store/auth';
+import { HydrateAuth } from '@/components/auth/HydrateAuth';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const hydrate = useAuthStore((s) => s.hydrate);
-
-  useEffect(() => {
-    hydrate();
-  }, [hydrate]);
-
-  return <>{children}</>;
+  return (
+    <>
+      <HydrateAuth />
+      {children}
+    </>
+  );
 }
