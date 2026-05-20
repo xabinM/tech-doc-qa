@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod/v4';
@@ -24,6 +25,14 @@ type FormValues = z.infer<typeof schema>;
 export default function LoginForm() {
   const router = useRouter();
   const hydrate = useAuthStore((s) => s.hydrate);
+
+  useEffect(() => {
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) window.location.reload();
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, []);
 
   const {
     register,
@@ -58,7 +67,7 @@ export default function LoginForm() {
         <CardDescription>Tech Doc Q&A 서비스에 로그인하세요</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
+        <form method="post" onSubmit={handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="email">이메일</Label>
             <Input

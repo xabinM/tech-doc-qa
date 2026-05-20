@@ -1,7 +1,6 @@
 'use client';
 
-import { useMutation } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { LogOut, UserRound } from 'lucide-react';
 import Link from 'next/link';
@@ -17,14 +16,15 @@ async function requestLogout() {
 }
 
 export function UserMenu() {
-  const router = useRouter();
   const hydrate = useAuthStore((s) => s.hydrate);
+  const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: requestLogout,
     onSuccess: () => {
+      queryClient.clear();
       hydrate();
-      router.push('/login');
+      window.location.replace('/login');
     },
     onError: (e) => toast.error(e.message),
   });

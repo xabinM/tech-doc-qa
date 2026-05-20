@@ -1,4 +1,5 @@
-const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8080';
+const BACKEND_URL = process.env.BACKEND_URL;
+if (!BACKEND_URL) throw new Error('BACKEND_URL 환경변수가 설정되지 않았습니다');
 
 export class ApiError extends Error {
   constructor(
