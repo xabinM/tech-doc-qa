@@ -64,6 +64,18 @@ public class JwtProvider implements TokenManager {
     }
 
     @Override
+    public boolean isAccessTokenExpired(String token) {
+        try {
+            Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token);
+            return false;
+        } catch (ExpiredJwtException e) {
+            return true;
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    @Override
     public Long getUserId(String token) {
         Claims claims = Jwts.parser()
                 .verifyWith(secretKey)

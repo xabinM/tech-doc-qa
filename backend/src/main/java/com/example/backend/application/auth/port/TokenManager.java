@@ -17,5 +17,10 @@ public interface TokenManager {
      */
     boolean validateAccessToken(String token);
 
+    /**
+     * 액세스 토큰이 만료된 경우 true를 반환한다. 서명이 유효하지 않으면 false.
+     */
+    boolean isAccessTokenExpired(String token);
+
     Long getUserId(String token);
 }

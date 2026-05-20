@@ -22,7 +22,9 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response,
                          AuthenticationException authException) throws IOException {
-        ErrorCode errorCode = ErrorCode.AUTH_TOKEN_INVALID;
+        ErrorCode errorCode = Boolean.TRUE.equals(request.getAttribute("jwtExpired"))
+                ? ErrorCode.AUTH_TOKEN_EXPIRED
+                : ErrorCode.AUTH_TOKEN_INVALID;
         response.setContentType(MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8");
         response.setStatus(errorCode.getHttpStatus().value());
         response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.fail(errorCode)));

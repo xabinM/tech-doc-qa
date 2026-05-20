@@ -25,11 +25,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String token = extractToken(request);
 
-        if (token != null && tokenManager.validateAccessToken(token)) {
-            Long userId = tokenManager.getUserId(token);
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(userId, null, List.of());
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+        if (token != null) {
+            if (tokenManager.validateAccessToken(token)) {
+                Long userId = tokenManager.getUserId(token);
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(userId, null, List.of());
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            } else if (tokenManager.isAccessTokenExpired(token)) {
+                request.setAttribute("jwtExpired", true);
+            }
         }
 
         filterChain.doFilter(request, response);
