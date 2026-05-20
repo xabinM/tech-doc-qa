@@ -5,7 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 import groq
 from elasticsearch import exceptions as es_exc
-from client.es import ping, load_model, close_es
+from client.es import ping, load_model, close_es, init_es
 from client.llm import init_llm
 from config import settings
 from router.query import router
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     if settings.internal_secret is None:
         logger.warning("INTERNAL_SECRET이 설정되지 않았습니다. /ask 인증이 비활성화된 상태입니다.")
+    init_es()
     init_llm()
     await load_model()
     yield
@@ -40,6 +41,12 @@ async def health():
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(status_code=400, content={"detail": "잘못된 요청입니다."})
+
+
+@app.exception_handler(RuntimeError)
+async def runtime_error_handler(request: Request, exc: RuntimeError):
+    logger.error(f"초기화 오류: {exc}")
+    return JSONResponse(status_code=503, content={"detail": "서비스를 일시적으로 사용할 수 없습니다."})
 
 
 @app.exception_handler(es_exc.TransportError)
