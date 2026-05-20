@@ -6,13 +6,16 @@ import com.example.backend.interfaces.query.dto.QueryHistoryResponse;
 import com.example.backend.interfaces.query.dto.QueryRequest;
 import com.example.backend.interfaces.query.dto.QueryResponse;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/query")
 @RequiredArgsConstructor
+@Validated
 public class QueryController {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
@@ -32,7 +35,7 @@ public class QueryController {
     public ApiResponse<QueryHistoryResponse> history(
             @AuthenticationPrincipal Long userId,
             @RequestParam(required = false) Long cursorId,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") @Min(1) int size
     ) {
         int pageSize = Math.min(size, DEFAULT_PAGE_SIZE);
         var logs = queryService.getHistory(userId, cursorId, pageSize);

@@ -10,10 +10,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -22,6 +22,13 @@ import java.util.List;
 public class QueryService {
 
     private static final String RATE_LIMIT_PREFIX = "rate:";
+    private static final String SECONDS_PER_DAY = "86400";
+    private static final RedisScript<Long> RATE_LIMIT_SCRIPT = RedisScript.of(
+            "local c = redis.call('INCR', KEYS[1])\n" +
+            "if c == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end\n" +
+            "return c",
+            Long.class
+    );
 
     private final RagPort ragPort;
     private final ChatSessionService chatSessionService;
@@ -53,13 +60,9 @@ public class QueryService {
 
     private void checkRateLimit(Long userId) {
         String key = RATE_LIMIT_PREFIX + userId + ":" + LocalDate.now();
-        Long count = redisTemplate.opsForValue().increment(key);
+        Long count = redisTemplate.execute(RATE_LIMIT_SCRIPT, List.of(key), SECONDS_PER_DAY);
 
-        if (count == 1) {
-            redisTemplate.expire(key, Duration.ofDays(1));
-        }
-
-        if (count > dailyMax) {
+        if (count != null && count > dailyMax) {
             throw new CustomException(ErrorCode.QUERY_RATE_LIMIT_EXCEEDED);
         }
     }
