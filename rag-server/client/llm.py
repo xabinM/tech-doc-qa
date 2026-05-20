@@ -49,7 +49,8 @@ async def generate_answer(question: str, chunks: list[str], history: list[dict] 
     response = await _client.chat.completions.create(
         model=settings.groq_model,
         max_tokens=1024,
-        messages=messages
+        messages=messages,
+        timeout=60.0,
     )
     if not response.choices:
         raise ValueError("LLM이 응답을 반환하지 않았습니다.")

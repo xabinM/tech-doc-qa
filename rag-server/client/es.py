@@ -4,9 +4,14 @@ from elasticsearch import AsyncElasticsearch
 from sentence_transformers import SentenceTransformer
 from config import settings
 
-_es = AsyncElasticsearch(settings.es_url)
+_es: AsyncElasticsearch | None = None
 _model: SentenceTransformer | None = None
 _encoder_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="encoder")
+
+
+def init_es() -> None:
+    global _es
+    _es = AsyncElasticsearch(settings.es_url)
 
 
 async def load_model() -> None:
@@ -16,15 +21,20 @@ async def load_model() -> None:
 
 
 async def close_es() -> None:
-    _encoder_pool.shutdown(wait=False)
-    await _es.close()
+    _encoder_pool.shutdown(wait=True)
+    if _es is not None:
+        await _es.close()
 
 
 async def ping() -> bool:
+    if _es is None:
+        return False
     return await _es.ping()
 
 
 async def search_docs(question: str) -> list[dict]:
+    if _es is None:
+        raise RuntimeError("Elasticsearch 클라이언트가 초기화되지 않았습니다.")
     if _model is None:
         raise RuntimeError("임베딩 모델이 초기화되지 않았습니다.")
     try:
