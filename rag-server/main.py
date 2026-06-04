@@ -27,6 +27,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="RAG Server", lifespan=lifespan)
 app.include_router(router)
 
+if settings.enable_mock_endpoint:
+    from router.mock import router as mock_router
+    app.include_router(mock_router)
+    logger.info("Mock 엔드포인트 활성화: /ask-mock (ENABLE_MOCK_ENDPOINT=true)")
+
 
 @app.get("/health")
 async def health():
