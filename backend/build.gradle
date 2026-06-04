@@ -32,10 +32,21 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 	implementation 'org.springframework.boot:spring-boot-starter-aop'
 
+	// Observability
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'io.micrometer:micrometer-registry-prometheus'
+	implementation 'net.logstash.logback:logstash-logback-encoder:8.0'
+
+	// Cache
+	implementation 'com.github.ben-manes.caffeine:caffeine'
+
 	// JWT
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+	// Batch
+	implementation 'org.springframework.boot:spring-boot-starter-batch'
 
 	// Circuit Breaker
 	implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
@@ -54,4 +65,11 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+// 가상 스레드 Pinning 감지 플래그
+// Pinning: synchronized 블록 내에서 virtual thread가 carrier thread를 점유하는 현상
+// 로그에 "VirtualThread ... pinned" 가 찍히면 해당 코드를 ReentrantLock으로 교체해야 함
+tasks.named('bootRun') {
+	jvmArgs '-Djdk.tracePinnedThreads=short'
 }
