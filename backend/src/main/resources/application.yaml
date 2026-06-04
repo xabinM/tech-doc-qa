@@ -4,11 +4,20 @@ spring:
   profiles:
     default: local
 
+  threads:
+    virtual:
+      enabled: true  # Java 21 가상 스레드: Tomcat 요청 스레드 + @Async 실행기를 가상 스레드로 전환
+
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 30   # 가상 스레드는 동시 DB 요청이 많아지므로 기본값(10)에서 상향
+      minimum-idle: 5
+      connection-timeout: 3000
+      idle-timeout: 600000
 
   jpa:
     hibernate:
@@ -27,6 +36,12 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
 
+  batch:
+    job:
+      enabled: false  # 시작 시 Job 자동 실행 방지 — BatchScheduler 또는 REST로만 트리거
+    jdbc:
+      initialize-schema: always  # Spring Batch 메타데이터 테이블 자동 생성 (PostgreSQL)
+
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiry: 3600000    # 1시간
@@ -35,12 +50,69 @@ jwt:
 rag:
   server:
     url: ${RAG_SERVER_URL:http://localhost:8000}
+    ask-path: /ask
     connect-timeout-ms: 3000
     read-timeout-ms: 30000
     internal-secret: ${RAG_INTERNAL_SECRET:}
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus, loggers
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        query.duration: true
+        rag.call.duration: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+        query.duration: 0.5, 0.95, 0.99
+        rag.call.duration: 0.5, 0.95, 0.99
+      slo:
+        http.server.requests: 100ms, 500ms, 1s, 5s, 10s, 30s
+
+logging:
+  level:
+    root: INFO
+    com.example.backend: DEBUG
+
+query:
+  rate-limit:
+    daily-max: 20
+
+idempotency:
+  wait-ms: 300         # PROCESSING 대기 폴링 간격 (가상 스레드: park으로 처리)
+  max-retries: 10      # 최대 대기 횟수 (300ms × 10 = 3초)
+
+cache:
+  query:
+    l1-max-size: 500          # L1(Caffeine) 최대 항목 수
+    l1-ttl-minutes: 5         # L1 TTL — 짧게 유지, L2가 원본
+    l2-ttl-minutes: 60        # L2(Redis) TTL — LLM 비용 절감 기간
+    lock-ttl-seconds: 30      # Stampede 방지 분산 락 TTL (RAG 최대 응답 시간보다 길게)
+    lock-wait-ms: 200         # 락 대기 폴링 간격
+    lock-max-retries: 15      # 최대 대기 횟수 (200ms × 15 = 3초)
+
+batch:
+  api:
+    enabled: false  # true 일 때만 BatchController 활성화 — 운영 배포 시 기본 비노출
+  schedule:
+    cleanup-cron: "0 0 2 * * *"    # 매일 새벽 2시: 오래된 데이터 정리
+    stats-cron: "0 0 1 * * *"      # 매일 새벽 1시: 전일 통계 집계
+    indexing-cron: "0 0 3 * * 0"   # 매주 일요일 새벽 3시: 문서 색인
+  cleanup:
+    query-logs-retention-days: 90
+    chat-sessions-retention-days: 30
 
 resilience4j:
   circuitbreaker:
