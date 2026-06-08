@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-06-08T05:44:44.889Z",
+  "scenario": "ramp-up",
+  "metrics": {
+    "http_req_duration_p95": 1192.0749843999995,
+    "http_req_failed_rate": 0.0005003266020874738,
+    "http_reqs_total": 71953,
+    "http_reqs_rate": 237.3169204791232,
+    "query_duration_p95": 1192.4014307999998
+  }
+}
