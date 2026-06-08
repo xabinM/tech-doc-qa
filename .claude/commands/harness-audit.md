@@ -8,6 +8,7 @@
 - `.claude/agents/*.md`
 - `.claude/commands/*.md`
 - `.claude/settings.local.json`
+- `.claude/work-log/issues/` (work-log 이슈 파일 목록)
 
 ## Step 2. 파일 크기 점검
 각 파일의 줄 수를 확인한다.
@@ -58,7 +59,14 @@ CLAUDE.md 파일 내 `@경로` 참조를 모두 추출해 파일 존재 여부 �
 - `backend/src/` 패키지 구조: CLAUDE.md의 패키지 구조 설명과 불일치
 - `docker-compose.yml`: 새 서비스 추가됐는데 agent/rule 없는 경우
 
-## Step 7. 결과 출력
+## Step 7. Work-Log 상태 점검
+`.claude/work-log/issues/` 이슈 파일들을 점검한다:
+- `status: resolved` 인데 `## 결과 (After)` 섹션이 비어있으면 `[INCOMPLETE]` 표시
+- `resume_worthy: true` 인데 `## 이력서 포인트` 섹션이 비어있으면 `[MISSING-RESUME]` 표시
+- `status: open` 으로 30일 이상 방치된 이슈 `[STALE]` 표시 (discovered 날짜 기준)
+- 이미지 경로가 명시됐는데 실제 파일이 없으면 `[BROKEN-IMAGE]` 표시
+
+## Step 8. 결과 출력
 
 ```
 ## Harness Audit 결과

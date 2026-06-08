@@ -77,6 +77,18 @@ $ARGUMENTS 에 대해 {동작}한다.
 
 ---
 
+## `update work-log` 수행 절차
+1. `.claude/work-log/issues/` 전체 파일 읽기
+2. 아래 항목 점검 후 보고:
+   - `[INCOMPLETE]`: `status: resolved` 인데 After 수치 없음
+   - `[MISSING-RESUME]`: `resume_worthy: true` 인데 이력서 포인트 미작성
+   - `[BROKEN-IMAGE]`: 이미지 경로 명시됐지만 파일 없음
+   - `[STALE]`: `status: open` 30일 초과
+3. 수정이 필요한 항목 목록화 후 사용자 확인
+4. 확인 후 해당 파일 업데이트
+
+---
+
 ## `sync` 수행 절차
 1. `git log --oneline -20` 로 최근 커밋 파악
 2. `git diff main...HEAD --name-only` 로 변경된 파일 목록 확인
