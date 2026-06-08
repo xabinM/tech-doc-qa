@@ -8,6 +8,7 @@ import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.JobParametersInvalidException;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.batch.core.repository.JobExecutionAlreadyRunningException;
+import org.springframework.batch.core.repository.JobInstanceAlreadyCompleteException;
 import org.springframework.batch.core.repository.JobRestartException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -61,6 +62,8 @@ public class BatchScheduler {
             log.info("배치 스케줄 실행 - job={}", jobName);
         } catch (JobExecutionAlreadyRunningException e) {
             log.warn("배치 이미 실행 중 - job={}", jobName);
+        } catch (JobInstanceAlreadyCompleteException e) {
+            log.warn("배치 이미 완료됨 - job={}", jobName);
         } catch (JobRestartException | JobParametersInvalidException e) {
             log.error("배치 실행 실패 - job={}, error={}", jobName, e.getMessage(), e);
         }
