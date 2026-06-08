@@ -14,7 +14,7 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 30   # 가상 스레드는 동시 DB 요청이 많아지므로 기본값(10)에서 상향
+      maximum-pool-size: 100  # 가상 스레드 + VU 300 부하 시 pool 30으로 pending 454 발생 → 100으로 상향
       minimum-idle: 5
       connection-timeout: 3000
       idle-timeout: 600000
