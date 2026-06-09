@@ -55,3 +55,7 @@ query_logs  : id, user_id, question, answer, created_at
 # Claude Behavioral Guidelines
 
 @.claude/rules/behavioral-guidelines.md
+
+# Work Log
+
+@.claude/rules/work-log.md

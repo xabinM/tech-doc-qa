@@ -1,0 +1,7 @@
+rag:
+  server:
+    ask-path: /ask-mock  # 실제 LLM 호출 없이 MOCK_DELAY_SECONDS 만큼 지연
+
+query:
+  rate-limit:
+    daily-max: 999999  # 부하 테스트 중 Rate Limit 간섭 제거
