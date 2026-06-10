@@ -14,20 +14,23 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.time.LocalDate;
 import java.util.List;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,21 +55,26 @@ class QueryServiceTest {
     StringRedisTemplate redisTemplate;
 
     @Mock
-    ValueOperations<String, String> valueOperations;
+    QueryCacheService queryCacheService;
 
     @BeforeEach
     void setUp() {
+        // @PostConstruct initMetrics()는 단위 테스트에서 호출되지 않으므로 수동 초기화
+        ReflectionTestUtils.setField(queryService, "meterRegistry", new SimpleMeterRegistry());
+        ReflectionTestUtils.invokeMethod(queryService, "initMetrics");
         ReflectionTestUtils.setField(queryService, "dailyMax", 20);
     }
 
     @Test
-    @DisplayName("질의 성공 - RAG 답변 반환 및 이벤트 발행")
-    void query_success() {
-        String rateKey = "rate:1:" + LocalDate.now();
-        given(redisTemplate.opsForValue()).willReturn(valueOperations);
-        given(valueOperations.increment(rateKey)).willReturn(1L);
+    @DisplayName("단일턴 질의 성공 - 캐시 경유 후 RAG 답변 반환 및 이벤트 발행")
+    void query_singleTurn_success() {
         given(chatSessionService.prepareSession(eq(1L), eq("Spring이란?"), eq(null)))
                 .willReturn(new ChatSessionService.SessionContext(100L, List.of()));
+        // 단일턴(이력 없음) → 캐시 경유. loader를 그대로 실행해 RAG 호출 여부까지 검증
+        given(queryCacheService.getOrCompute(anyString(), any())).willAnswer(inv -> {
+            Supplier<String> loader = inv.getArgument(1);
+            return loader.get();
+        });
         given(ragPort.ask(eq("Spring이란?"), anyList())).willReturn("Spring은 자바 프레임워크입니다.");
 
         QueryService.QueryResult result = queryService.query(1L, "Spring이란?", null);
@@ -83,16 +91,33 @@ class QueryServiceTest {
     }
 
     @Test
+    @DisplayName("멀티턴 질의 - 대화 이력이 있으면 캐시를 우회하고 RAG 직접 호출")
+    void query_multiTurn_bypassesCache() {
+        ConversationTurn previousTurn = new ConversationTurn("이전 질문", "이전 답변");
+        given(chatSessionService.prepareSession(eq(1L), eq("그건 왜 그래?"), eq(10L)))
+                .willReturn(new ChatSessionService.SessionContext(10L, List.of(previousTurn)));
+        given(ragPort.ask(eq("그건 왜 그래?"), anyList())).willReturn("맥락 기반 답변");
+
+        QueryService.QueryResult result = queryService.query(1L, "그건 왜 그래?", 10L);
+
+        assertThat(result.answer()).isEqualTo("맥락 기반 답변");
+        // 멀티턴은 캐시를 거치지 않아야 한다 (정합성·프라이버시)
+        verify(queryCacheService, never()).getOrCompute(anyString(), any());
+        verify(ragPort).ask(eq("그건 왜 그래?"), anyList());
+    }
+
+    @Test
     @DisplayName("일일 요청 한도 초과 시 QUERY_RATE_LIMIT_EXCEEDED 예외 발생")
     void query_rateLimitExceeded() {
-        String rateKey = "rate:1:" + LocalDate.now();
-        given(redisTemplate.opsForValue()).willReturn(valueOperations);
-        given(valueOperations.increment(rateKey)).willReturn(21L);
+        given(redisTemplate.execute(any(RedisScript.class), anyList(), any())).willReturn(21L);
 
         assertThatThrownBy(() -> queryService.query(1L, "Spring이란?", null))
                 .isInstanceOf(CustomException.class)
                 .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                         .isEqualTo(ErrorCode.QUERY_RATE_LIMIT_EXCEEDED));
+
+        // 한도 초과 시 RAG 호출로 진행되면 안 된다
+        verify(ragPort, never()).ask(anyString(), anyList());
     }
 
     @Test

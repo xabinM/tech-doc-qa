@@ -70,25 +70,35 @@ public class QueryService {
         checkRateLimit(userId);
         queryCounter.increment();
 
-        String cacheKey = QueryCacheService.cacheKeyOf(question);
-
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
             // 세션 준비 (트랜잭션 커밋까지 완료)
             ChatSessionService.SessionContext ctx = chatSessionService.prepareSession(userId, question, sessionId);
 
-            // L1 → L2 → RAG 순서로 조회 (Stampede 방지 포함)
-            // 캐시 히트 시 loader lambda는 실행되지 않음
-            String answer = queryCacheService.getOrCompute(
-                    cacheKey,
-                    () -> ragPort.ask(question, ctx.history())
-            );
+            String answer = answerFor(question, ctx);
 
             eventPublisher.publishEvent(new QueryCompletedEvent(userId, question, answer, ctx.sessionId()));
             return new QueryResult(answer, ctx.sessionId());
         } finally {
             sample.stop(queryTimer);
         }
+    }
+
+    /**
+     * 답변을 생성한다.
+     *
+     * 답변 = f(질문, 대화이력)이므로, 대화이력이 없는 단일턴(세션 첫 질문)에서만 전역 캐시를 사용한다.
+     * 멀티턴은 대화 맥락이 캐시 키에 반영되지 않아, 같은 질문 텍스트가 다른 맥락의 답을 반환하는
+     * 정합성·프라이버시 문제가 생긴다. 따라서 멀티턴은 캐시를 우회하고 직접 호출한다.
+     */
+    private String answerFor(String question, ChatSessionService.SessionContext ctx) {
+        if (!ctx.history().isEmpty()) {
+            // 멀티턴: 답이 대화 맥락에 의존 → 전역 캐시 부적합
+            return ragPort.ask(question, ctx.history());
+        }
+        // 단일턴: 답 = f(질문) → 전역 캐시 안전 (L1 → L2 → RAG, Stampede 방지 포함)
+        String cacheKey = QueryCacheService.cacheKeyOf(question);
+        return queryCacheService.getOrCompute(cacheKey, () -> ragPort.ask(question, ctx.history()));
     }
 
     @Transactional(readOnly = true)
