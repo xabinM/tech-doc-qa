@@ -10,12 +10,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
@@ -36,6 +39,12 @@ public class QueryCacheService {
 
     private static final String L2_PREFIX   = "query:cache:";
     private static final String LOCK_PREFIX = "query:lock:";
+
+    // 락 소유권 확인 후 삭제 (compare-and-delete): 락 TTL 만료 뒤 다른 스레드가 잡은 락을 지우는 것을 방지
+    private static final RedisScript<Long> UNLOCK_SCRIPT = RedisScript.of(
+            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+            Long.class
+    );
 
     private final StringRedisTemplate redisTemplate;
     private final MeterRegistry meterRegistry;
@@ -63,6 +72,7 @@ public class QueryCacheService {
     private Counter l2HitCounter;
     private Counter missCounter;
     private Counter stampedeBlockedCounter;
+    private Counter cacheWriteFailedCounter;
 
     @PostConstruct
     void init() {
@@ -76,6 +86,7 @@ public class QueryCacheService {
         l2HitCounter       = Counter.builder("cache.query.hit").tag("level", "L2").description("L2 캐시 히트").register(meterRegistry);
         missCounter        = Counter.builder("cache.query.miss").description("캐시 완전 미스 (RAG 실제 호출)").register(meterRegistry);
         stampedeBlockedCounter = Counter.builder("cache.query.stampede.blocked").description("Stampede 방지로 대기 후 캐시 반환된 요청").register(meterRegistry);
+        cacheWriteFailedCounter = Counter.builder("cache.query.write.failed").description("L2 캐시 저장 실패 (요청은 정상 처리)").register(meterRegistry);
 
         // Caffeine 통계를 Gauge로 노출 (Grafana 확인용)
         Gauge.builder("cache.query.l1.hit_rate", l1Cache, c -> c.stats().hitRate())
@@ -111,8 +122,9 @@ public class QueryCacheService {
 
     private String computeWithLock(String cacheKey, Supplier<String> loader) {
         String lockKey = LOCK_PREFIX + cacheKey;
+        String lockToken = UUID.randomUUID().toString();
         Boolean acquired = redisTemplate.opsForValue()
-                .setIfAbsent(lockKey, "1", lockTtlSeconds, TimeUnit.SECONDS);
+                .setIfAbsent(lockKey, lockToken, lockTtlSeconds, TimeUnit.SECONDS);
 
         if (Boolean.TRUE.equals(acquired)) {
             // 락 획득 → 이 스레드만 loader 실행
@@ -124,10 +136,11 @@ public class QueryCacheService {
                     return cached;
                 }
                 String result = loader.get();
-                putBoth(cacheKey, result);
+                putBothSafely(cacheKey, result);
                 return result;
             } finally {
-                redisTemplate.delete(lockKey);
+                // 내가 잡은 락일 때만 삭제 (compare-and-delete)
+                redisTemplate.execute(UNLOCK_SCRIPT, List.of(lockKey), lockToken);
             }
         }
 
@@ -161,17 +174,26 @@ public class QueryCacheService {
         // 최대 대기 초과 (드문 케이스) → 직접 실행 후 저장
         log.warn("캐시 Stampede 대기 초과, 직접 loader 실행: key={}", cacheKey);
         String result = loader.get();
-        try {
-            putBoth(cacheKey, result);
-        } catch (Exception e) {
-            log.warn("캐시 저장 실패 (요청은 정상 처리): error={}", e.getMessage());
-        }
+        putBothSafely(cacheKey, result);
         return result;
     }
 
     private void putBoth(String cacheKey, String value) {
         l1Cache.put(cacheKey, value);
         redisTemplate.opsForValue().set(L2_PREFIX + cacheKey, value, l2TtlMinutes, TimeUnit.MINUTES);
+    }
+
+    /**
+     * 캐시 저장은 부가 작업이므로 실패해도 요청 자체는 정상 처리한다.
+     * (L1은 putBoth 내부에서 먼저 채워지고, L2(Redis) 장애만 여기서 흡수된다)
+     */
+    private void putBothSafely(String cacheKey, String value) {
+        try {
+            putBoth(cacheKey, value);
+        } catch (Exception e) {
+            cacheWriteFailedCounter.increment();
+            log.warn("캐시 저장 실패 (요청은 정상 처리): key={}, error={}", cacheKey, e.getMessage());
+        }
     }
 
     /**

@@ -101,7 +101,7 @@ cache:
     l2-ttl-minutes: 60        # L2(Redis) TTL — LLM 비용 절감 기간
     lock-ttl-seconds: 30      # Stampede 방지 분산 락 TTL (RAG 최대 응답 시간보다 길게)
     lock-wait-ms: 200         # 락 대기 폴링 간격
-    lock-max-retries: 15      # 최대 대기 횟수 (200ms × 15 = 3초)
+    lock-max-retries: 40      # 최대 대기 횟수 (200ms × 40 = 8초, RAG 응답 시간 + 여유 확보)
 
 batch:
   api:
