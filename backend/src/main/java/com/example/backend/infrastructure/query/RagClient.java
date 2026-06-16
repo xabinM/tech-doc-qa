@@ -9,12 +9,16 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
+
+import static com.example.backend.common.filter.RequestLoggingFilter.MDC_REQUEST_ID;
+import static com.example.backend.common.filter.RequestLoggingFilter.REQUEST_ID_HEADER;
 
 @Component
 public class RagClient implements RagPort {
@@ -52,10 +56,18 @@ public class RagClient implements RagPort {
                 .map(t -> new AskRequest.HistoryItem(t.question(), t.answer()))
                 .toList();
 
+        // 다중 서버 환경에서 backend ↔ rag-server 로그를 동일 요청으로 추적하기 위해 전파
+        String requestId = MDC.get(MDC_REQUEST_ID);
+
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
             return webClient.post()
                     .uri(askPath)
+                    .headers(headers -> {
+                        if (requestId != null) {
+                            headers.set(REQUEST_ID_HEADER, requestId);
+                        }
+                    })
                     .bodyValue(new AskRequest(question, historyItems))
                     .retrieve()
                     .bodyToMono(AskResponse.class)
