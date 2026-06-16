@@ -42,6 +42,12 @@ spring:
     jdbc:
       initialize-schema: always  # Spring Batch 메타데이터 테이블 자동 생성 (PostgreSQL)
 
+server:
+  # Tomcat RemoteIpValve 활성화: 신뢰 가능한 내부 프록시(사설 IP 대역)가 보낸
+  # X-Forwarded-For 만 반영해 getRemoteAddr()를 실제 클라이언트 IP로 보정한다.
+  # 외부에서 직접 위조한 XFF는 무시되어 IP 스푸핑을 방지한다. (K8s ingress 환경 대비)
+  forward-headers-strategy: native
+
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiry: 3600000    # 1시간
