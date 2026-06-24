@@ -20,6 +20,8 @@ public enum ErrorCode {
     QUERY_RATE_LIMIT_EXCEEDED("QUERY_002", "일일 요청 한도를 초과했습니다", HttpStatus.TOO_MANY_REQUESTS),
     QUERY_SESSION_NOT_FOUND("QUERY_003", "존재하지 않는 채팅 세션입니다", HttpStatus.NOT_FOUND),
     QUERY_IDEMPOTENCY_PROCESSING("QUERY_004", "동일한 요청이 처리 중입니다. 잠시 후 다시 시도해주세요", HttpStatus.CONFLICT),
+    QUERY_JOB_NOT_FOUND("QUERY_005", "존재하지 않는 질의 작업입니다", HttpStatus.NOT_FOUND),
+    QUERY_STREAM_FAILED("QUERY_006", "답변 스트림 처리 중 오류가 발생했습니다", HttpStatus.SERVICE_UNAVAILABLE),
 
     // User
     USER_NOT_FOUND("USER_001", "존재하지 않는 사용자입니다", HttpStatus.NOT_FOUND),
