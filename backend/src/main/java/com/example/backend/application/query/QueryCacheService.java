@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
@@ -82,6 +83,26 @@ public class QueryCacheService {
                 .description("L1 캐시 히트율 (0.0~1.0)").register(meterRegistry);
         Gauge.builder("cache.query.l1.size", l1Cache, c -> (double) c.estimatedSize())
                 .description("L1 캐시 현재 항목 수").register(meterRegistry);
+    }
+
+    /**
+     * loader 실행 없이 캐시(L1 → L2)만 조회한다.
+     * 비동기 제출 단계에서 캐시 히트(동기 즉시 반환) 여부를 판정하는 데 사용한다.
+     * 히트 시 L2 값을 L1로 승격한다. 미스이면 Optional.empty().
+     */
+    public Optional<String> getIfCached(String cacheKey) {
+        String l1 = l1Cache.getIfPresent(cacheKey);
+        if (l1 != null) {
+            l1HitCounter.increment();
+            return Optional.of(l1);
+        }
+        String l2 = redisTemplate.opsForValue().get(L2_PREFIX + cacheKey);
+        if (l2 != null) {
+            l2HitCounter.increment();
+            l1Cache.put(cacheKey, l2);
+            return Optional.of(l2);
+        }
+        return Optional.empty();
     }
 
     /**

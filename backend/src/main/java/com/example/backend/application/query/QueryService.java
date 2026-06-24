@@ -1,7 +1,7 @@
 package com.example.backend.application.query;
 
 import com.example.backend.application.query.event.QueryCompletedEvent;
-import com.example.backend.application.query.port.RagPort;
+import com.example.backend.application.query.port.QueryJobQueue;
 import com.example.backend.common.exception.CustomException;
 import com.example.backend.common.exception.ErrorCode;
 import com.example.backend.domain.query.QueryLog;
@@ -11,6 +11,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -20,6 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static com.example.backend.common.filter.RequestLoggingFilter.MDC_REQUEST_ID;
 
 @Service
 @RequiredArgsConstructor
@@ -34,20 +39,20 @@ public class QueryService {
             Long.class
     );
 
-    private final RagPort ragPort;
     private final ChatSessionService chatSessionService;
     private final QueryLogRepository queryLogRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final StringRedisTemplate redisTemplate;
     private final MeterRegistry meterRegistry;
     private final QueryCacheService queryCacheService;
+    private final QueryJobQueue queryJobQueue;
 
     @Value("${query.rate-limit.daily-max:20}")
     private int dailyMax;
 
     private Counter queryCounter;
     private Counter rateLimitCounter;
-    private Timer queryTimer;
+    private Timer submitTimer;
 
     @PostConstruct
     void initMetrics() {
@@ -57,16 +62,22 @@ public class QueryService {
         rateLimitCounter = Counter.builder("query.rate_limit.blocked")
                 .description("Rate Limit 초과 차단 횟수")
                 .register(meterRegistry);
-        queryTimer = Timer.builder("query.duration")
-                .description("질문 처리 전체 소요 시간 (RAG 호출 포함)")
+        submitTimer = Timer.builder("query.duration")
+                .description("질의 제출 처리 소요 시간 (Rate Limit·세션 준비·캐시 조회·잡 발행)")
                 .publishPercentiles(0.5, 0.95, 0.99)
                 .publishPercentileHistogram()
                 .register(meterRegistry);
     }
 
-    // 트랜잭션 없음 - RAG 호출 중 DB 커넥션 점유 방지
-    // prepareSession에서 트랜잭션을 열고 커밋한 뒤 RAG 호출
-    public QueryResult query(Long userId, String question, Long sessionId) {
+    /**
+     * 질의를 제출한다. 비동기 처리 진입점.
+     *
+     * 동기 구간만 수행하고 즉시 반환한다 — RAG 호출은 워커가 비동기로 처리한다.
+     *   1. Rate Limit 검사 (큐 오염 방지를 위해 발행 전에 거절)
+     *   2. 세션 준비 (트랜잭션 커밋까지 완료)
+     *   3. 캐시 조회 → 히트면 동기 즉시 반환(Completed), 미스면 작업 큐 발행(Accepted)
+     */
+    public SubmitResult submit(Long userId, String question, Long sessionId) {
         checkRateLimit(userId);
         queryCounter.increment();
 
@@ -74,20 +85,21 @@ public class QueryService {
 
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
-            // 세션 준비 (트랜잭션 커밋까지 완료)
             ChatSessionService.SessionContext ctx = chatSessionService.prepareSession(userId, question, sessionId);
 
-            // L1 → L2 → RAG 순서로 조회 (Stampede 방지 포함)
-            // 캐시 히트 시 loader lambda는 실행되지 않음
-            String answer = queryCacheService.getOrCompute(
-                    cacheKey,
-                    () -> ragPort.ask(question, ctx.history())
-            );
+            Optional<String> cached = queryCacheService.getIfCached(cacheKey);
+            if (cached.isPresent()) {
+                // 캐시 히트 → 비동기 처리 없이 즉시 반환, 이력 저장 이벤트 발행
+                eventPublisher.publishEvent(new QueryCompletedEvent(userId, question, cached.get(), ctx.sessionId()));
+                return new SubmitResult.Completed(cached.get(), ctx.sessionId());
+            }
 
-            eventPublisher.publishEvent(new QueryCompletedEvent(userId, question, answer, ctx.sessionId()));
-            return new QueryResult(answer, ctx.sessionId());
+            // 캐시 미스 → 비동기 작업 발행 (워커가 RAG 호출·스트리밍·이력 저장 담당)
+            String jobId = UUID.randomUUID().toString();
+            queryJobQueue.publish(new QueryJob(jobId, userId, question, ctx.sessionId(), MDC.get(MDC_REQUEST_ID)));
+            return new SubmitResult.Accepted(jobId, ctx.sessionId());
         } finally {
-            sample.stop(queryTimer);
+            sample.stop(submitTimer);
         }
     }
 
@@ -106,5 +118,13 @@ public class QueryService {
         }
     }
 
-    public record QueryResult(String answer, Long sessionId) {}
+    /**
+     * 제출 결과.
+     *   Completed → 캐시 히트, answer 즉시 반환 (HTTP 200)
+     *   Accepted  → 캐시 미스, jobId 반환 후 클라이언트가 스트림 구독 (HTTP 202)
+     */
+    public sealed interface SubmitResult permits SubmitResult.Completed, SubmitResult.Accepted {
+        record Completed(String answer, Long sessionId) implements SubmitResult {}
+        record Accepted(String jobId, Long sessionId) implements SubmitResult {}
+    }
 }
