@@ -49,6 +49,19 @@ public class ChatSessionService {
         return new SessionContext(session.getId(), history);
     }
 
+    /**
+     * 세션의 최근 대화 history를 조회한다 (비동기 워커가 RAG 호출 직전에 사용).
+     * 소유권 검증은 제출 단계(prepareSession)에서 이미 수행됐으므로 여기서는 생략한다.
+     */
+    @Transactional(readOnly = true)
+    public List<ConversationTurn> loadConversationHistory(Long sessionId) {
+        List<QueryLog> recentLogs = queryLogRepository.findLatestBySessionId(sessionId, HISTORY_CONTEXT_MAX);
+        Collections.reverse(recentLogs);
+        return recentLogs.stream()
+                .map(log -> new ConversationTurn(log.getQuestion(), log.getAnswer()))
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public List<ChatSession> listSessions(Long userId, Long cursorId, int size) {
         return chatSessionRepository.findByUserIdWithCursor(userId, cursorId, size);
