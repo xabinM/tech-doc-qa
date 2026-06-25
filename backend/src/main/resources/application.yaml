@@ -97,6 +97,8 @@ logging:
 query:
   rate-limit:
     daily-max: 20
+  worker:
+    concurrency: 4   # 질의 작업 컨슈머 동시 처리 수 (consumer 수 = 스레드풀 크기)
 
 idempotency:
   wait-ms: 300         # PROCESSING 대기 폴링 간격 (가상 스레드: park으로 처리)

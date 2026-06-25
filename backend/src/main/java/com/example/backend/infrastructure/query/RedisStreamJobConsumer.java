@@ -5,6 +5,7 @@ import com.example.backend.application.query.QueryJobProcessor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
@@ -14,6 +15,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.stream.StreamListener;
 import org.springframework.data.redis.stream.StreamMessageListenerContainer;
 import org.springframework.data.redis.stream.StreamMessageListenerContainer.StreamMessageListenerContainerOptions;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -39,9 +41,13 @@ public class RedisStreamJobConsumer
     private final StringRedisTemplate redisTemplate;
     private final RedisConnectionFactory connectionFactory;
     private final QueryJobProcessor processor;
-    private final String consumerName = "worker-" + UUID.randomUUID().toString().substring(0, 8);
+    private final String consumerPrefix = "worker-" + UUID.randomUUID().toString().substring(0, 8);
+
+    @Value("${query.worker.concurrency:4}")
+    private int concurrency;
 
     private StreamMessageListenerContainer<String, MapRecord<String, String, String>> container;
+    private ThreadPoolTaskExecutor executor;
 
     public RedisStreamJobConsumer(StringRedisTemplate redisTemplate,
                                   RedisConnectionFactory connectionFactory,
@@ -55,19 +61,32 @@ public class RedisStreamJobConsumer
     public void afterPropertiesSet() {
         ensureConsumerGroup();
 
+        // 각 consumer 구독은 처리 중(블로킹 RAG 스트리밍) 스레드를 점유하므로,
+        // concurrency 만큼 스레드와 consumer를 두어 잡을 병렬 처리한다.
+        executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(concurrency);
+        executor.setMaxPoolSize(concurrency);
+        executor.setThreadNamePrefix("query-worker-");
+        executor.initialize();
+
         StreamMessageListenerContainerOptions<String, MapRecord<String, String, String>> options =
                 StreamMessageListenerContainerOptions.builder()
                         .pollTimeout(Duration.ofSeconds(2))
+                        .executor(executor)
                         .build();
 
         container = StreamMessageListenerContainer.create(connectionFactory, options);
-        container.receive(
-                Consumer.from(CONSUMER_GROUP, consumerName),
-                StreamOffset.create(JOBS_STREAM_KEY, ReadOffset.lastConsumed()),
-                this
-        );
+        for (int i = 0; i < concurrency; i++) {
+            // Consumer Group이 메시지를 consumer들에 분배 → 병렬 처리
+            container.receive(
+                    Consumer.from(CONSUMER_GROUP, consumerPrefix + "-" + i),
+                    StreamOffset.create(JOBS_STREAM_KEY, ReadOffset.lastConsumed()),
+                    this
+            );
+        }
         container.start();
-        log.info("질의 작업 컨슈머 시작 - group={}, consumer={}", CONSUMER_GROUP, consumerName);
+        log.info("질의 작업 컨슈머 시작 - group={}, consumerPrefix={}, concurrency={}",
+                CONSUMER_GROUP, consumerPrefix, concurrency);
     }
 
     private void ensureConsumerGroup() {
@@ -106,6 +125,9 @@ public class RedisStreamJobConsumer
     public void destroy() {
         if (container != null) {
             container.stop();
+        }
+        if (executor != null) {
+            executor.shutdown();
         }
     }
 }
