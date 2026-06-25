@@ -57,8 +57,10 @@ rag:
   server:
     url: ${RAG_SERVER_URL:http://localhost:8000}
     ask-path: /ask
+    ask-stream-path: /ask/stream
     connect-timeout-ms: 3000
     read-timeout-ms: 30000
+    stream-timeout-ms: 120000   # 스트리밍 요청 per-request 응답 타임아웃 (긴 답변 대비, 기본 30s 초과 방지)
     internal-secret: ${RAG_INTERNAL_SECRET:}
 
 cors:

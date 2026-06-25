@@ -190,6 +190,11 @@ public class QueryCacheService {
         return result;
     }
 
+    /** 외부에서 계산한 값을 캐시에 저장한다 (스트리밍 완료 후 누적된 전체 답변 저장용). */
+    public void put(String cacheKey, String value) {
+        putBoth(cacheKey, value);
+    }
+
     private void putBoth(String cacheKey, String value) {
         l1Cache.put(cacheKey, value);
         redisTemplate.opsForValue().set(L2_PREFIX + cacheKey, value, l2TtlMinutes, TimeUnit.MINUTES);
