@@ -1,6 +1,7 @@
 package com.example.backend.application.query;
 
 import com.example.backend.application.query.event.QueryCompletedEvent;
+import com.example.backend.application.query.port.JobOwnershipStore;
 import com.example.backend.application.query.port.QueryJobQueue;
 import com.example.backend.common.exception.CustomException;
 import com.example.backend.common.exception.ErrorCode;
@@ -56,11 +57,14 @@ class QueryServiceTest {
     @Mock
     QueryJobQueue queryJobQueue;
 
+    @Mock
+    JobOwnershipStore jobOwnershipStore;
+
     @BeforeEach
     void setUp() {
         // MeterRegistry는 실제 SimpleMeterRegistry 사용 — Counter.register()가 정상 동작해야 함
         queryService = new QueryService(chatSessionService, queryLogRepository, eventPublisher,
-                redisTemplate, new SimpleMeterRegistry(), queryCacheService, queryJobQueue);
+                redisTemplate, new SimpleMeterRegistry(), queryCacheService, queryJobQueue, jobOwnershipStore);
         ReflectionTestUtils.setField(queryService, "dailyMax", 20);
         queryService.initMetrics();
     }
@@ -108,6 +112,7 @@ class QueryServiceTest {
         assertThat(captor.getValue().jobId()).isEqualTo(accepted.jobId());
         assertThat(captor.getValue().question()).isEqualTo("Spring이란?");
         assertThat(captor.getValue().sessionId()).isEqualTo(100L);
+        verify(jobOwnershipStore).register(accepted.jobId(), 1L);
         verify(eventPublisher, never()).publishEvent(any());
     }
 

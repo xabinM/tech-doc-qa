@@ -34,6 +34,20 @@ public class AnswerSseRelay {
         return emitter;
     }
 
+    /** 즉시 error 이벤트 한 건을 보내고 종료하는 SSE 응답 (권한 없음 등). 재연결 루프 방지를 위해 4xx 대신 사용. */
+    public SseEmitter error(String message) {
+        SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
+        Thread.ofVirtual().name("sse-error").start(() -> {
+            try {
+                emitter.send(SseEmitter.event().name("error").data(message));
+                emitter.complete();
+            } catch (IOException e) {
+                emitter.completeWithError(e);
+            }
+        });
+        return emitter;
+    }
+
     private void pump(SseEmitter emitter, String jobId, String lastEventId) {
         String offset = (lastEventId == null || lastEventId.isBlank()) ? "0" : lastEventId;
         long idleWaited = 0;

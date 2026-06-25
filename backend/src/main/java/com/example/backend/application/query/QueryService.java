@@ -1,6 +1,7 @@
 package com.example.backend.application.query;
 
 import com.example.backend.application.query.event.QueryCompletedEvent;
+import com.example.backend.application.query.port.JobOwnershipStore;
 import com.example.backend.application.query.port.QueryJobQueue;
 import com.example.backend.common.exception.CustomException;
 import com.example.backend.common.exception.ErrorCode;
@@ -46,6 +47,7 @@ public class QueryService {
     private final MeterRegistry meterRegistry;
     private final QueryCacheService queryCacheService;
     private final QueryJobQueue queryJobQueue;
+    private final JobOwnershipStore jobOwnershipStore;
 
     @Value("${query.rate-limit.daily-max:20}")
     private int dailyMax;
@@ -96,6 +98,7 @@ public class QueryService {
 
             // 캐시 미스 → 비동기 작업 발행 (워커가 RAG 호출·스트리밍·이력 저장 담당)
             String jobId = UUID.randomUUID().toString();
+            jobOwnershipStore.register(jobId, userId);  // 스트림 구독 시 소유권 검증용
             queryJobQueue.publish(new QueryJob(jobId, userId, question, ctx.sessionId(), MDC.get(MDC_REQUEST_ID)));
             return new SubmitResult.Accepted(jobId, ctx.sessionId());
         } finally {
