@@ -49,7 +49,7 @@ class AuthControllerTest {
     TokenManager tokenManager;
 
     @Test
-    @DisplayName("회원가입 성공 시 200 OK와 success:true 반환")
+    @DisplayName("회원가입 성공 시 201 Created와 success:true 반환")
     void signup_success() throws Exception {
         var request = new AuthSignupRequest("test@example.com", "password1");
 
@@ -57,7 +57,7 @@ class AuthControllerTest {
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").doesNotExist())
                 .andExpect(jsonPath("$.error").doesNotExist());

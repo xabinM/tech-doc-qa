@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -78,14 +79,18 @@ class ChatSessionServiceTest {
         QueryLog log2 = QueryLog.create(1L, 10L, "AOP란?", "AOP는 관점 지향 프로그래밍입니다.");
 
         given(chatSessionRepository.findById(10L)).willReturn(Optional.of(session));
-        given(queryLogRepository.findLatestBySessionId(eq(10L), anyInt())).willReturn(List.of(log2, log1));
+        // findLatestBySessionId는 최신순(DESC) 반환 — 실제 JPA처럼 가변 리스트로 모킹
+        // (prepareSession이 Collections.reverse로 시간순 정렬하므로 불변 List.of는 예외)
+        given(queryLogRepository.findLatestBySessionId(eq(10L), anyInt()))
+                .willReturn(new ArrayList<>(List.of(log2, log1)));
 
         ChatSessionService.SessionContext ctx = chatSessionService.prepareSession(1L, "추가 질문", 10L);
 
         assertThat(ctx.sessionId()).isEqualTo(10L);
         assertThat(ctx.history()).hasSize(2);
-        assertThat(ctx.history().get(0).question()).isEqualTo("AOP란?");
-        assertThat(ctx.history().get(1).question()).isEqualTo("Spring이란?");
+        // reverse 후 시간순(오래된 것 먼저): Spring → AOP
+        assertThat(ctx.history().get(0).question()).isEqualTo("Spring이란?");
+        assertThat(ctx.history().get(1).question()).isEqualTo("AOP란?");
     }
 
     @Test
