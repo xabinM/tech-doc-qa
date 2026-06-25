@@ -1,6 +1,6 @@
 # 비동기 토큰 스트리밍 RAG 파이프라인 설계 (Redis Streams)
 
-- 상태: **설계 확정 — 구현 전**
+- 상태: **구현 완료** — 구현·이슈 해결 기록은 [async-streaming-implementation.md](./async-streaming-implementation.md) 참조
 - 작성일: 2026-06-24
 - 영향 범위: `backend` (Spring) · `rag-server` (FastAPI) · `frontend` (Next.js)
 - 목표: 동기 요청-응답으로 동작하는 질의 처리를 **비동기 + 토큰 스트리밍(ChatGPT식 타자기 효과) + 재연결/재생** 구조로 전환한다. 추가 미들웨어 없이 **Redis Streams 단독**으로 잡 큐와 토큰 전달을 모두 처리한다.
