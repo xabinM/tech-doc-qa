@@ -16,6 +16,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.scheduler.Schedulers;
 import reactor.netty.http.client.HttpClientRequest;
 
 import java.time.Duration;
@@ -87,6 +88,9 @@ public class RagClient implements RagPort {
                     .bodyValue(new AskRequest(question, historyItems))
                     .retrieve()
                     .bodyToFlux(SSE_TYPE)
+                    // 토큰 처리(블로킹 Redis XADD)를 Netty 이벤트 루프 밖으로 옮긴다 —
+                    // 이벤트 루프에서 블로킹하면 다른 요청의 I/O까지 막힌다
+                    .publishOn(Schedulers.boundedElastic())
                     .doOnNext(event -> handleEvent(event, onToken))
                     .blockLast();
         } finally {
