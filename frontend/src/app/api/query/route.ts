@@ -2,14 +2,19 @@ import { NextResponse } from 'next/server';
 import { backendFetch, ApiError } from '@/lib/api/backend';
 import { withAuth } from '@/lib/api/withAuth';
 
-type QueryResponse = { answer: string };
+type QuerySubmitResponse = {
+  status: 'completed' | 'accepted';
+  jobId?: string;
+  answer?: string;
+  sessionId: number;
+};
 
 export async function POST(request: Request) {
   const body = await request.json();
 
   try {
     const data = await withAuth((token) =>
-      backendFetch<QueryResponse>('/api/v1/query', {
+      backendFetch<QuerySubmitResponse>('/api/v1/query', {
         method: 'POST',
         body: JSON.stringify(body),
         token,

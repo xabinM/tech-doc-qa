@@ -18,7 +18,14 @@ type Message = { id: number; question: string; answer: string; createdAt: string
 const schema = z.object({ question: z.string().min(1, '질문을 입력해주세요') });
 type FormValues = z.infer<typeof schema>;
 
-async function postQuery(question: string, sessionId: number | null) {
+type SubmitResult = {
+  status: 'completed' | 'accepted';
+  jobId?: string;
+  answer?: string;
+  sessionId: number;
+};
+
+async function postQuery(question: string, sessionId: number | null): Promise<SubmitResult> {
   const res = await fetch('/api/query', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -26,7 +33,7 @@ async function postQuery(question: string, sessionId: number | null) {
   });
   const json = await res.json();
   if (!json.success) throw new Error(json.error?.message ?? '오류가 발생했습니다');
-  return json.data as { answer: string; sessionId: number };
+  return json.data as SubmitResult;
 }
 
 async function fetchSessions(): Promise<SessionsData> {
@@ -76,24 +83,55 @@ export function ChatPage() {
     resolver: zodResolver(schema),
   });
 
-  const queryMutation = useMutation({
-    mutationFn: (values: FormValues) => postQuery(values.question, currentSessionId),
-    onSuccess: (data, variables) => {
-      if (currentSessionId === null) {
-        setCurrentSessionId(data.sessionId);
-        queryClient.invalidateQueries({ queryKey: ['sessions'] });
+  const [streaming, setStreaming] = useState(false);
+  const esRef = useRef<EventSource | null>(null);
+
+  const closeStream = useCallback(() => {
+    esRef.current?.close();
+    esRef.current = null;
+  }, []);
+
+  // 마지막(스트리밍 중인) 턴의 답변에 토큰을 누적한다
+  const appendToLastAnswer = useCallback((token: string) => {
+    setPendingMessages((prev) => {
+      if (prev.length === 0) return prev;
+      const copy = [...prev];
+      const last = copy[copy.length - 1];
+      copy[copy.length - 1] = { ...last, answer: last.answer + token };
+      return copy;
+    });
+  }, []);
+
+  const startStream = useCallback((jobId: string) => {
+    closeStream();
+    const es = new EventSource(`/api/query/${jobId}/stream`);
+    esRef.current = es;
+
+    es.addEventListener('token', (e) => appendToLastAnswer((e as MessageEvent).data));
+    es.addEventListener('done', () => {
+      closeStream();
+      setStreaming(false);
+    });
+    es.addEventListener('error', (e) => {
+      // data가 있으면 서버가 보낸 앱 레벨 오류 → 종료. 없으면 연결 오류 → 자동 재연결(재생)
+      if ((e as MessageEvent).data) {
+        closeStream();
+        setStreaming(false);
+        toast.error('답변 생성 중 오류가 발생했습니다');
       }
-      setPendingMessages((prev) => [...prev, { question: variables.question, answer: data.answer }]);
-      reset();
-    },
-    onError: (e) => toast.error(e.message),
-  });
+    });
+  }, [appendToLastAnswer, closeStream]);
+
+  // 컴포넌트 언마운트 시 스트림 정리
+  useEffect(() => () => closeStream(), [closeStream]);
 
   const deleteMutation = useMutation({
     mutationFn: deleteSession,
     onSuccess: (_, sessionId) => {
       queryClient.invalidateQueries({ queryKey: ['sessions'] });
       if (currentSessionId === sessionId) {
+        closeStream();
+        setStreaming(false);
         setCurrentSessionId(null);
         setPendingMessages([]);
       }
@@ -104,22 +142,49 @@ export function ChatPage() {
   });
 
   const selectSession = useCallback((sessionId: number) => {
+    closeStream();
+    setStreaming(false);
     setCurrentSessionId(sessionId);
     setPendingMessages([]);
     setConfirmDeleteId(null);
-  }, []);
+  }, [closeStream]);
 
   const startNewChat = useCallback(() => {
+    closeStream();
+    setStreaming(false);
     setCurrentSessionId(null);
     setPendingMessages([]);
     setConfirmDeleteId(null);
-  }, []);
+  }, [closeStream]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [displayMessages.length]);
 
-  const submitQuestion = handleSubmit((v) => queryMutation.mutate(v));
+  const submitQuestion = handleSubmit(async (values) => {
+    const question = values.question;
+    reset();
+    // 질문을 낙관적으로 추가(답변은 빈 문자열로 시작 — 스트리밍으로 채워짐)
+    setPendingMessages((prev) => [...prev, { question, answer: '' }]);
+    setStreaming(true);
+    try {
+      const data = await postQuery(question, currentSessionId);
+      if (currentSessionId === null) {
+        setCurrentSessionId(data.sessionId);
+        queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      }
+      if (data.status === 'completed') {
+        appendToLastAnswer(data.answer ?? '');
+        setStreaming(false);
+      } else {
+        startStream(data.jobId!);
+      }
+    } catch (e) {
+      setStreaming(false);
+      setPendingMessages((prev) => prev.slice(0, -1)); // 낙관적으로 추가한 빈 턴 제거
+      toast.error(e instanceof Error ? e.message : '오류가 발생했습니다');
+    }
+  });
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -186,7 +251,7 @@ export function ChatPage() {
       {/* 메인 채팅 영역 */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
-          {displayMessages.length === 0 && !queryMutation.isPending && (
+          {displayMessages.length === 0 && !streaming && (
             <div className="h-full flex flex-col items-center justify-center gap-2 text-center">
               <p className="text-base font-medium">무엇이 궁금하신가요?</p>
               <p className="text-sm text-muted-foreground">
@@ -204,19 +269,17 @@ export function ChatPage() {
               </div>
               <div className="flex justify-start">
                 <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-[75%]">
-                  <MarkdownRenderer content={turn.answer} />
+                  {turn.answer === '' && streaming && i === displayMessages.length - 1 ? (
+                    <span className="animate-pulse text-sm text-muted-foreground">
+                      답변을 생성하고 있습니다...
+                    </span>
+                  ) : (
+                    <MarkdownRenderer content={turn.answer} />
+                  )}
                 </div>
               </div>
             </div>
           ))}
-
-          {queryMutation.isPending && (
-            <div className="flex justify-start">
-              <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-muted-foreground">
-                <span className="animate-pulse">답변을 생성하고 있습니다...</span>
-              </div>
-            </div>
-          )}
 
           <div ref={messagesEndRef} />
         </div>
@@ -232,7 +295,7 @@ export function ChatPage() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    submitQuestion();
+                    if (!streaming) submitQuestion();
                   }
                 }}
                 {...register('question')}
@@ -241,8 +304,8 @@ export function ChatPage() {
                 <p className="text-sm text-destructive mt-1">{errors.question.message}</p>
               )}
             </div>
-            <Button type="submit" disabled={queryMutation.isPending} className="shrink-0 mb-0.5">
-              {queryMutation.isPending ? '생성 중' : '전송'}
+            <Button type="submit" disabled={streaming} className="shrink-0 mb-0.5">
+              {streaming ? '생성 중' : '전송'}
             </Button>
           </form>
         </div>
