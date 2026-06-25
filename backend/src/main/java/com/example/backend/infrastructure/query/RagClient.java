@@ -4,6 +4,8 @@ import com.example.backend.application.query.ConversationTurn;
 import com.example.backend.application.query.port.RagPort;
 import com.example.backend.common.exception.CustomException;
 import com.example.backend.common.exception.ErrorCode;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -34,6 +36,7 @@ public class RagClient implements RagPort {
 
     private final WebClient webClient;
     private final MeterRegistry meterRegistry;
+    private final ObjectMapper objectMapper;
 
     @Value("${rag.server.ask-stream-path:/ask/stream}")
     private String askStreamPath;
@@ -44,9 +47,11 @@ public class RagClient implements RagPort {
     private Timer ragCallTimer;
     private Counter ragFallbackCounter;
 
-    public RagClient(@Qualifier("ragWebClient") WebClient webClient, MeterRegistry meterRegistry) {
+    public RagClient(@Qualifier("ragWebClient") WebClient webClient, MeterRegistry meterRegistry,
+                     ObjectMapper objectMapper) {
         this.webClient = webClient;
         this.meterRegistry = meterRegistry;
+        this.objectMapper = objectMapper;
     }
 
     @PostConstruct
@@ -103,9 +108,18 @@ public class RagClient implements RagPort {
             throw new CustomException(ErrorCode.QUERY_RAG_SERVER_ERROR);
         }
         if ("token".equals(event.event()) && event.data() != null) {
-            onToken.accept(event.data());
+            // 토큰은 JSON 문자열로 인코딩되어 옴 → 파싱해 공백·개행 복원
+            onToken.accept(parseToken(event.data()));
         }
         // "done" 이벤트는 스트림 자연 종료 — 별도 처리 불필요
+    }
+
+    private String parseToken(String data) {
+        try {
+            return objectMapper.readValue(data, String.class);
+        } catch (JsonProcessingException e) {
+            return data;  // 비JSON이면 원문 사용 (방어적)
+        }
     }
 
     private void streamFallback(String question, List<ConversationTurn> history,

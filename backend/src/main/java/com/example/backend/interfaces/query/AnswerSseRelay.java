@@ -2,6 +2,8 @@ package com.example.backend.interfaces.query;
 
 import com.example.backend.application.query.port.AnswerStreamReader;
 import com.example.backend.application.query.port.AnswerStreamReader.AnswerEvent;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -16,6 +18,10 @@ import java.util.List;
  * 가상 스레드에서 XREAD BLOCK 루프를 돌며 토큰을 전송하고, done/error 수신 또는
  * 유휴 타임아웃 시 종료한다. 각 SSE 이벤트의 id는 스트림 엔트리 ID이므로
  * 클라이언트가 끊긴 뒤 Last-Event-ID로 재구독하면 그 지점부터 재생된다.
+ *
+ * data 값은 JSON 문자열로 인코딩한다 — SSE 규격상 'data:'의 선행 공백 제거나
+ * 개행이 이벤트 구분자로 먹히는 문제를 피해 토큰의 공백·개행을 온전히 보존한다.
+ * 클라이언트는 JSON.parse 후 사용한다.
  */
 @Slf4j
 @Component
@@ -27,6 +33,7 @@ public class AnswerSseRelay {
     private static final long MAX_IDLE_MS = 60 * 1000L;             // 토큰 없이 최대 대기 후 종료
 
     private final AnswerStreamReader reader;
+    private final ObjectMapper objectMapper;
 
     public SseEmitter subscribe(String jobId, String lastEventId) {
         SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
@@ -39,7 +46,7 @@ public class AnswerSseRelay {
         SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
         Thread.ofVirtual().name("sse-error").start(() -> {
             try {
-                emitter.send(SseEmitter.event().name("error").data(message));
+                emitter.send(SseEmitter.event().name("error").data(toJson(message)));
                 emitter.complete();
             } catch (IOException e) {
                 emitter.completeWithError(e);
@@ -64,7 +71,8 @@ public class AnswerSseRelay {
                 }
                 idleWaited = 0;
                 for (AnswerEvent event : events) {
-                    emitter.send(SseEmitter.event().id(event.id()).name(event.type()).data(event.payload()));
+                    // data를 JSON 문자열로 인코딩 → 공백·개행 보존 (클라이언트는 JSON.parse)
+                    emitter.send(SseEmitter.event().id(event.id()).name(event.type()).data(toJson(event.payload())));
                     offset = event.id();
                     if ("done".equals(event.type()) || "error".equals(event.type())) {
                         emitter.complete();
@@ -78,6 +86,14 @@ public class AnswerSseRelay {
         } catch (Exception e) {
             log.warn("SSE relay 오류 - jobId={}, error={}", jobId, e.getMessage());
             emitter.completeWithError(e);
+        }
+    }
+
+    private String toJson(String value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            return "\"\"";  // String 직렬화라 사실상 발생하지 않음
         }
     }
 }

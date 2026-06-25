@@ -51,7 +51,9 @@ async def ask_stream(request: AskRequest) -> StreamingResponse:
         try:
             async for event_type, payload in rag.ask_stream(request.question, history):
                 if event_type == "token":
-                    yield _sse("token", payload)
+                    # 토큰을 JSON 문자열로 인코딩 → 공백·개행이 SSE 멀티라인 처리에
+                    # 휩쓸리지 않고 한 줄로 안전 전송 (수신측은 JSON 파싱)
+                    yield _sse("token", json.dumps(payload, ensure_ascii=False))
                 else:  # done
                     yield _sse("done", json.dumps({"sources": payload}, ensure_ascii=False))
         except Exception as exc:

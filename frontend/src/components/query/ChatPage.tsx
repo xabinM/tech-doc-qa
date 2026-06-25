@@ -107,7 +107,14 @@ export function ChatPage() {
     const es = new EventSource(`/api/query/${jobId}/stream`);
     esRef.current = es;
 
-    es.addEventListener('token', (e) => appendToLastAnswer((e as MessageEvent).data));
+    es.addEventListener('token', (e) => {
+      // data는 JSON 문자열로 인코딩되어 옴 (공백·개행 보존). 파싱 실패한 토큰은 건너뛴다.
+      try {
+        appendToLastAnswer(JSON.parse((e as MessageEvent).data) as string);
+      } catch {
+        /* 손상된 토큰 무시 */
+      }
+    });
     es.addEventListener('done', () => {
       closeStream();
       setStreaming(false);

@@ -247,7 +247,7 @@ class TestAskEndpoint(unittest.TestCase):
         self.assertIn("text/event-stream", response.headers["content-type"])
         body = response.text
         self.assertIn("event: token", body)
-        self.assertIn("data: Spring", body)
+        self.assertIn('data: "Spring"', body)  # 토큰은 JSON 문자열로 인코딩됨
         self.assertIn("event: done", body)
         self.assertIn("https://example.com", body)
 
