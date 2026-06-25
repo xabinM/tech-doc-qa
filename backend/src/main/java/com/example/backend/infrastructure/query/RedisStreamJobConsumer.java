@@ -21,14 +21,18 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ThreadPoolExecutor;
 
 import static com.example.backend.infrastructure.query.RedisStreamQueryJobQueue.JOBS_STREAM_KEY;
 
 /**
  * query:jobs 스트림 Consumer Group 소비자.
  *
- * 앱 기동 시 Consumer Group을 보장(없으면 생성)하고 컨테이너를 시작한다.
- * 메시지를 QueryJob으로 파싱해 QueryJobProcessor에 위임하고, 정상 처리 후 XACK 한다.
+ * 단일 consumer가 블로킹 XREADGROUP으로 메시지를 읽고(Lettuce 공유 커넥션에서 블로킹
+ * 읽기를 1개로 제한해 커넥션 경합을 피한다), 실제 처리(블로킹 RAG 스트리밍)는 별도
+ * executor로 분리해 병렬화한다. executor 포화 시 CallerRunsPolicy로 폴링 스레드가
+ * 직접 처리해 읽기를 늦춤으로써 자연스러운 백프레셔가 걸린다.
+ *
  * 처리기가 RAG 오류를 자체 처리(스트림에 error 발행)하므로 통상 경로는 항상 ack 된다.
  */
 @Slf4j
@@ -41,7 +45,7 @@ public class RedisStreamJobConsumer
     private final StringRedisTemplate redisTemplate;
     private final RedisConnectionFactory connectionFactory;
     private final QueryJobProcessor processor;
-    private final String consumerPrefix = "worker-" + UUID.randomUUID().toString().substring(0, 8);
+    private final String consumerName = "worker-" + UUID.randomUUID().toString().substring(0, 8);
 
     @Value("${query.worker.concurrency:4}")
     private int concurrency;
@@ -61,32 +65,29 @@ public class RedisStreamJobConsumer
     public void afterPropertiesSet() {
         ensureConsumerGroup();
 
-        // 각 consumer 구독은 처리 중(블로킹 RAG 스트리밍) 스레드를 점유하므로,
-        // concurrency 만큼 스레드와 consumer를 두어 잡을 병렬 처리한다.
+        // 처리 전용 스레드풀 — 읽기(폴링)와 분리. 포화 시 CallerRunsPolicy로 백프레셔.
         executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(concurrency);
         executor.setMaxPoolSize(concurrency);
+        executor.setQueueCapacity(concurrency * 2);
         executor.setThreadNamePrefix("query-worker-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
 
         StreamMessageListenerContainerOptions<String, MapRecord<String, String, String>> options =
                 StreamMessageListenerContainerOptions.builder()
                         .pollTimeout(Duration.ofSeconds(2))
-                        .executor(executor)
                         .build();
 
         container = StreamMessageListenerContainer.create(connectionFactory, options);
-        for (int i = 0; i < concurrency; i++) {
-            // Consumer Group이 메시지를 consumer들에 분배 → 병렬 처리
-            container.receive(
-                    Consumer.from(CONSUMER_GROUP, consumerPrefix + "-" + i),
-                    StreamOffset.create(JOBS_STREAM_KEY, ReadOffset.lastConsumed()),
-                    this
-            );
-        }
+        container.receive(
+                Consumer.from(CONSUMER_GROUP, consumerName),
+                StreamOffset.create(JOBS_STREAM_KEY, ReadOffset.lastConsumed()),
+                this
+        );
         container.start();
-        log.info("질의 작업 컨슈머 시작 - group={}, consumerPrefix={}, concurrency={}",
-                CONSUMER_GROUP, consumerPrefix, concurrency);
+        log.info("질의 작업 컨슈머 시작 - group={}, consumer={}, processingConcurrency={}",
+                CONSUMER_GROUP, consumerName, concurrency);
     }
 
     private void ensureConsumerGroup() {
@@ -100,13 +101,22 @@ public class RedisStreamJobConsumer
 
     @Override
     public void onMessage(MapRecord<String, String, String> record) {
+        final QueryJob job;
         try {
-            processor.process(toJob(record.getValue()));
-            redisTemplate.opsForStream().acknowledge(JOBS_STREAM_KEY, CONSUMER_GROUP, record.getId());
+            job = toJob(record.getValue());
         } catch (Exception e) {
-            // 파싱 등 예기치 못한 실패 — ack하지 않아 PEL에 남김 (Phase 3에서 XAUTOCLAIM/DLQ 처리)
-            log.error("질의 작업 소비 실패 - recordId={}, error={}", record.getId(), e.getMessage(), e);
+            // 파싱 실패 — ack하지 않아 PEL에 남김 (Phase 3에서 XAUTOCLAIM/DLQ 처리)
+            log.error("질의 작업 파싱 실패 - recordId={}, error={}", record.getId(), e.getMessage(), e);
+            return;
         }
+        // 처리(블로킹 RAG 스트리밍)를 폴링 스레드와 분리. 완료 후 ack.
+        executor.execute(() -> {
+            try {
+                processor.process(job);
+            } finally {
+                redisTemplate.opsForStream().acknowledge(JOBS_STREAM_KEY, CONSUMER_GROUP, record.getId());
+            }
+        });
     }
 
     private QueryJob toJob(Map<String, String> body) {
