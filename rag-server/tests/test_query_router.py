@@ -227,6 +227,61 @@ class TestAskEndpoint(unittest.TestCase):
         # then
         self.assertEqual(400, response.status_code)
 
+    # ------------------------------------------------------------------
+    # /ask/stream SSE 스트리밍
+    # ------------------------------------------------------------------
+
+    def test_ask_stream_정상_토큰과done이벤트반환(self):
+        # given: rag.ask_stream을 (event_type, payload) 튜플 async 생성기로 교체
+        async def fake_stream(question, history):
+            yield ("token", "Spring")
+            yield ("token", "은 프레임워크")
+            yield ("done", ["https://example.com"])
+
+        with patch("router.query.rag.ask_stream", new=fake_stream):
+            # when
+            response = self.client.post("/ask/stream", json={"question": "Spring이란?"})
+
+        # then
+        self.assertEqual(200, response.status_code)
+        self.assertIn("text/event-stream", response.headers["content-type"])
+        body = response.text
+        self.assertIn("event: token", body)
+        self.assertIn("data: Spring", body)
+        self.assertIn("event: done", body)
+        self.assertIn("https://example.com", body)
+
+    def test_ask_stream_생성중오류_error이벤트반환(self):
+        # given: 토큰 일부 전송 후 예외 발생
+        async def failing_stream(question, history):
+            yield ("token", "부분 답변")
+            raise RuntimeError("LLM 폭발")
+
+        with patch("router.query.rag.ask_stream", new=failing_stream):
+            # when
+            response = self.client.post("/ask/stream", json={"question": "질문"})
+
+        # then: 스트리밍은 200으로 시작하고 오류는 error 이벤트로 전달
+        self.assertEqual(200, response.status_code)
+        body = response.text
+        self.assertIn("event: token", body)
+        self.assertIn("event: error", body)
+        self.assertIn("LLM 폭발", body)
+
+    def test_ask_stream_internal_secret불일치_403응답(self):
+        # given: secret 설정 + 헤더 불일치
+        mock_settings = MagicMock()
+        mock_settings.internal_secret = "super-secret"
+        with patch("router.query.settings", mock_settings):
+            response = self.client.post(
+                "/ask/stream",
+                json={"question": "질문"},
+                headers={"X-Internal-Secret": "wrong"},
+            )
+
+        # then
+        self.assertEqual(403, response.status_code)
+
 
 if __name__ == "__main__":
     unittest.main()

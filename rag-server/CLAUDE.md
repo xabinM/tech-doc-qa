@@ -46,8 +46,10 @@ rag-server/
 
 # API Spec
 ```
-POST /ask       { question: str } → { answer: str, sources: list[str] }
-GET  /health    → { status: "ok" } | 503 { status: "unhealthy", detail: str }
+POST /ask         { question: str } → { answer: str, sources: list[str] }
+POST /ask/stream  { question: str } → SSE: event:token/done/error
+                  (token=텍스트 조각, done={"sources":[...]}, error=메시지)
+GET  /health      → { status: "ok" } | 503 { status: "unhealthy", detail: str }
 ```
 
 # Key Design Decisions

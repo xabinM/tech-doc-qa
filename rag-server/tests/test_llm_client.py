@@ -231,6 +231,37 @@ class TestGenerateAnswer(unittest.TestCase):
         self.assertIn("A" * 5000, user_content)
         self.assertNotIn("B" * 5000, user_content)
 
+    # ------------------------------------------------------------------
+    # generate_answer_stream 단위 테스트
+    # ------------------------------------------------------------------
+
+    def test_generate_answer_stream_토큰순차반환(self):
+        # given: stream=True 시 create()가 반환하는 async 이터레이터를 흉내
+        async def fake_stream_iter():
+            for text in ["Spring", " Boot"]:
+                delta = MagicMock()
+                delta.content = text
+                choice = MagicMock()
+                choice.delta = delta
+                chunk = MagicMock()
+                chunk.choices = [choice]
+                yield chunk
+
+        mock_create = AsyncMock(return_value=fake_stream_iter())
+
+        with patch.object(llm_module, "_client") as mock_client:
+            mock_client.chat.completions.create = mock_create
+
+            # when
+            async def collect():
+                return [t async for t in llm_module.generate_answer_stream("질문", ["청크"])]
+
+            result = run(collect())
+
+        # then: 토큰이 순서대로 반환되고 stream=True 파라미터가 전달됨
+        self.assertEqual(["Spring", " Boot"], result)
+        self.assertTrue(mock_create.call_args.kwargs["stream"])
+
 
 if __name__ == "__main__":
     unittest.main()
