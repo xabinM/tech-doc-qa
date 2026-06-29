@@ -19,7 +19,7 @@
 - **재연결/재생**: 연결이 끊겨도 마지막 수신 지점부터 이어받기
 
 ### 기술 선택 — 왜 Redis Streams 단독인가
-- 이미 Redis를 Rate Limit·캐시·Refresh Token에 운영 중 → **인프라 추가 0**
+- 이미 Redis를 Rate Limit·Refresh Token에 운영 중 → **인프라 추가 0**
 - Kafka는 "특정 브라우저 1명에게 실시간 타겟 전달"에 부적합(파티션/컨슈머그룹 모델). 마지막 전달 hop은 Redis가 정석이므로 잡 큐까지 Redis로 통일하는 것이 가장 단순하면서 강력하다.
 - Redis Stream 1개 기술로 **잡 큐 + 토큰 전달 + 재연결**을 모두 충족.
 
@@ -30,18 +30,17 @@
 ```
 브라우저 ChatPage (EventSource)
   └─ POST /api/query (Next BFF) ─→ POST /api/v1/query (backend)
-        ├─ 캐시 히트 → 200 {answer}  (즉시)
-        └─ 캐시 미스 → 202 {jobId} + query:jobs 스트림에 XADD
+        └─ 202 {jobId} + query:jobs 스트림에 XADD
   └─ GET /api/query/{jobId}/stream (Next BFF SSE 프록시)
         └─ GET /api/v1/query/{jobId}/stream (backend SSE relay)
               └─ answer:{jobId} 스트림 XREAD BLOCK
 
 [워커]  RedisStreamJobConsumer (Consumer Group "workers")
    └─ query:jobs 소비 → QueryJobProcessor
-        ├─ 캐시 재확인 → 미스 시 RagPort.askStream()
+        ├─ RagPort.askStream()
         │     └─ rag-server POST /ask/stream (Groq stream=True)
         ├─ 토큰 도착마다 answer:{jobId} XADD (+ 전체 누적)
-        ├─ 완료 시 캐시 적재 + 이력(query_logs) 저장
+        ├─ 완료 시 이력(query_logs) 저장
         └─ XACK
 ```
 
@@ -62,7 +61,7 @@ SSE를 보유한 백엔드 인스턴스가 누가 `answer:{jobId}`에 XADD했든
 |-------|------|------|
 | 설계 | 설계 문서 | `98f127d` |
 | 1 | 잡 큐 발행 인프라 (`QueryJob`·`QueryJobQueue`·`RedisStreamQueryJobQueue`) | `652ca66` |
-| 1 | `POST /query` 비동기 제출 전환 (202+jobId, 캐시 히트 즉시반환, 멱등성 A안) | `cde2b50` |
+| 1 | `POST /query` 비동기 제출 전환 (202+jobId, 멱등성 A안) | `cde2b50` |
 | 1 | 워커(`RedisStreamJobConsumer`·`QueryJobProcessor`·`AnswerStream`) + 이력 흡수 | `c63c103` |
 | 1 | SSE 엔드포인트(`QueryStreamController`·`AnswerSseRelay`·`AnswerStreamReader`) | `63fd20f` |
 | 0 | rag-server 토큰 스트리밍 `POST /ask/stream` (Groq stream=True) | `7517f3a` |
@@ -70,9 +69,9 @@ SSE를 보유한 백엔드 인스턴스가 누가 `answer:{jobId}`에 XADD했든
 | 4 | 프론트 스트리밍 UI (EventSource + BFF SSE 프록시) | `8625f07` |
 
 ### 핵심 설계 결정
-- **멱등성 A안**: `Idempotency-Key` 레코드가 동기 완료 시 `answer`, 비동기 발행 시 `jobId`를 저장. 중복 요청은 같은 jobId로 **동일 답변 스트림에 재구독** → 멱등성과 재연결을 jobId로 통합.
+- **멱등성 A안**: `Idempotency-Key` 레코드에 발행된 `jobId`를 저장. 중복 요청은 같은 jobId로 **동일 답변 스트림에 재구독** → 멱등성과 재연결을 jobId로 통합.
 - **트랜잭션 미개방**: 워커는 RAG 호출 중 DB 트랜잭션을 열지 않는다(커넥션 풀 고갈 방지 규칙 준수). history 조회·이력 저장은 각각 짧은 독립 트랜잭션.
-- **이력 저장 흡수**: 캐시 미스 경로의 이력 저장이 워커로 흡수됨(jobId 멱등 키). 캐시 히트 경로는 기존 `QueryCompletedEvent` 유지.
+- **이력 저장 흡수**: 이력 저장이 워커로 흡수됨(jobId 멱등 키).
 - **헥사고날 경계**: `RagPort.askStream`은 Reactor 타입 대신 `Consumer<String>` 콜백을 노출해 application 계층을 기술 중립으로 유지.
 
 ---
@@ -126,7 +125,7 @@ docker compose로 실제 인프라(Postgres·Redis·ES)를 띄우고 backend·ra
 | rag-server | pytest **35 통과** (스트리밍 정상/오류/인증 + llm 토큰 순차) |
 | backend (라이브 인프라) | 전체 스위트 **58 통과** |
 | frontend | `tsc --noEmit` 통과 |
-| 라이브 e2e | signup(201)→login→202(jobId)→SSE 토큰 스트리밍→done, 이력 저장·캐시 히트·IDOR 차단·공백/개행 보존 확인 |
+| 라이브 e2e | signup(201)→login→202(jobId)→SSE 토큰 스트리밍→done, 이력 저장·IDOR 차단·공백/개행 보존 확인 |
 | Redis 배선 | `query:jobs`의 `workers` Consumer Group 실제 생성, Flyway V1~V6 적용 확인 |
 
 ---
@@ -137,10 +136,9 @@ docker compose로 실제 인프라(Postgres·Redis·ES)를 띄우고 backend·ra
 ```
 application/query/
   QueryJob.java                  잡 메시지 모델
-  QueryService.java              제출(submit): RateLimit·캐시조회·잡발행·소유권등록
-  QueryJobProcessor.java         워커 처리 로직: 캐시→RAG스트리밍→토큰발행→이력저장
-  QueryCacheService.java         L1/L2 캐시 (getIfCached, put 추가)
-  IdempotencyService.java        멱등성 A안 (answer/jobId 분기)
+  QueryService.java              제출(submit): RateLimit·잡발행·소유권등록
+  QueryJobProcessor.java         워커 처리 로직: RAG스트리밍→토큰발행→이력저장
+  IdempotencyService.java        멱등성 A안 (jobId 저장)
   port/
     QueryJobQueue.java           잡 발행 포트
     AnswerStream.java            답변 스트림 발행 포트 (token/done/error)
@@ -155,10 +153,10 @@ infrastructure/query/
   RedisJobOwnershipStore.java    job:owner:{jobId} 저장/검증
   RagClient.java                 WebClient SSE 소비 + CircuitBreaker (JSON 토큰 파싱)
 interfaces/query/
-  QueryController.java           POST /query (200/202)
+  QueryController.java           POST /query (202)
   QueryStreamController.java     GET /query/{jobId}/stream (소유권 검증)
   AnswerSseRelay.java            answer 스트림 → SSE relay (JSON 인코딩)
-  dto/QuerySubmitResponse.java   status=completed/accepted 통합 DTO
+  dto/QuerySubmitResponse.java   status=accepted DTO
 ```
 
 ### rag-server
@@ -170,7 +168,7 @@ client/llm.py      generate_answer_stream: Groq stream=True
 
 ### frontend
 ```
-app/api/query/route.ts                 POST 프록시 (status=completed/accepted)
+app/api/query/route.ts                 POST 프록시 (status=accepted)
 app/api/query/[jobId]/stream/route.ts  SSE 프록시 (AT 주입·401 refresh·Last-Event-ID)
 components/query/ChatPage.tsx           EventSource 토큰 누적(타자기) + JSON.parse
 ```
@@ -180,7 +178,6 @@ components/query/ChatPage.tsx           EventSource 토큰 누적(타자기) + J
 ## 7. 남은 개선 항목 (Phase 3 백로그)
 
 - **DLQ + XAUTOCLAIM**: 파싱 실패 등 미처리(PEL) 메시지의 재claim/폐기. 현재는 PEL 잔류만.
-- **스트리밍 Stampede 방지 재통합**: 스트리밍 전환으로 `getOrCompute`(분산 락) 미사용. 동일 질문 동시 미스 시 RAG 중복 호출 가능.
 - **SSE 취소 강화**: `SseEmitter.onCompletion/onTimeout` 플래그로 클라이언트 종료 즉시 pump 중단(현재는 다음 send 실패로 감지).
 - **블로킹 Redis 커넥션 격리**: SSE relay의 XREAD BLOCK이 공유 Lettuce 커넥션을 점유. 다수 SSE 동시 연결 시 전용 커넥션(`shareNativeConnection=false`) 검토.
 - **메트릭**: 큐 깊이(`XLEN`)·대기 lag·생성 시간·활성 SSE 수.

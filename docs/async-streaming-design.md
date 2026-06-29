@@ -12,7 +12,7 @@
 현재 질의 흐름(`QueryService.query()`)은 동기 블로킹이다.
 
 ```
-요청 → RateLimit(Redis) → prepareSession(DB커밋) → 캐시조회 → RAG호출(블로킹)
+요청 → RateLimit(Redis) → prepareSession(DB커밋) → RAG호출(블로킹)
      → publishEvent(QueryCompletedEvent) → 응답
                   ↓
        @Async @EventListener → QueryLog DB 저장 (인메모리, at-most-once)
@@ -25,7 +25,7 @@ UI/UX 전면 개편에 맞춰 **토큰 스트리밍 UX**를 도입한다. 이는
 - `ISSUE-003`에서 진단된 *prepareSession + @Async 핸들러의 DB 커넥션 경합* → 워커 풀이 쓰기 동시성을 자연 제한
 
 ### 기술 선택 근거
-- **Redis Streams 단독**: 이미 Redis를 Rate Limit·캐시·Refresh Token에 운영 중 → 인프라 추가 0.
+- **Redis Streams 단독**: 이미 Redis를 Rate Limit·Refresh Token에 운영 중 → 인프라 추가 0.
 - Kafka는 "특정 브라우저 1명에게 실시간 타겟 전달"에 부적합(파티션/컨슈머그룹 모델). 마지막 홉은 Redis가 정석이므로, 잡 큐까지 Redis로 통일하는 것이 가장 단순하면서 강력하다.
 
 ### 알려진 사전 사실
@@ -68,9 +68,8 @@ SSE를 보유한 인스턴스가 누가 `XADD` 했든 `answer:{jobId}`를 읽기
 ```
 1. checkRateLimit(userId)          유지. 큐에 넣기 전에 거절
 2. prepareSession()                유지. sessionId·history 즉시 확보 후 워커에 전달
-3. 캐시 L1/L2 조회                  히트 → 비동기 없이 200 + 답 즉시 반환
-4. (미스) jobId 생성 → query:jobs 에 XADD
-5. return 202 { jobId, sessionId }
+3. jobId 생성 → query:jobs 에 XADD
+4. return 202 { jobId, sessionId }
 ```
 
 ### ② 처리 — 워커(Consumer)
@@ -79,7 +78,6 @@ SSE를 보유한 인스턴스가 누가 `XADD` 했든 `answer:{jobId}`를 읽기
 2. ragPort.askStream(question, history)  ← Circuit Breaker 여기 위치
 3. RAG가 토큰 Flux 를 흘리면 → answer:{jobId} 에 토큰별 XADD
 4. 완료:
-     - 캐시에 최종 답 저장 (getOrCompute populate)
      - QueryLog 저장  ← 이력 저장 흡수 (jobId 멱등 키로 중복 방지)
      - answer:{jobId} 에 done 마커 XADD + EXPIRE
      - XACK
@@ -99,7 +97,7 @@ SSE를 보유한 인스턴스가 누가 `XADD` 했든 `answer:{jobId}`를 읽기
 
 | 메서드 | 경로 | 동작 | 상태코드 |
 |--------|------|------|----------|
-| POST | `/api/v1/query` | 캐시 히트→답 / 미스→잡 발행 | 200(히트) / **202(미스)** `{jobId, sessionId}` |
+| POST | `/api/v1/query` | 잡 발행 | **202** `{jobId, sessionId}` |
 | GET | `/api/v1/query/{jobId}/stream` | SSE 토큰 스트림 (Last-Event-ID 지원) | 200 `text/event-stream` |
 | GET | `/api/v1/query/{jobId}` | 상태/결과 폴링 (SSE 차단 환경 폴백) | 200 |
 
@@ -114,7 +112,7 @@ rag-server (신규):
 ## 5. 서비스별 변경점
 
 ### backend (Spring)
-- `QueryService`: 제출 로직만 남기고, 잡 발행 책임 추가. 캐시 히트 시 즉시 반환 분기.
+- `QueryService`: 제출 로직만 남기고, 잡 발행 책임 추가.
 - 신규 `QueryStreamPublisher` / `RedisStreamJobQueue`(infrastructure): `query:jobs` XADD.
 - 신규 워커: `StreamMessageListenerContainer` + 리스너 → RAG 스트리밍 호출 → `answer:{jobId}` XADD.
 - 신규 SSE 컨트롤러: `GET /query/{jobId}/stream` → `answer:{jobId}` XREAD relay.
@@ -141,7 +139,6 @@ rag-server (신규):
 | 기존 요소 | 비동기 구조 위치 |
 |-----------|------------------|
 | Rate Limit (Redis Lua) | 제출 단계 |
-| 캐시 L1/L2 (`QueryCacheService`) | 제출 시 조회 + 워커 완료 시 저장 |
 | Circuit Breaker (`RagClient`) | 워커 내부 |
 | 이력 저장 (`QueryCompletedEvent`) | 워커에 흡수, jobId 멱등 키 |
 | `X-Request-Id` (MDC) | jobId와 함께 큐 메시지에 실어 end-to-end 추적 |

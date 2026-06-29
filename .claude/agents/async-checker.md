@@ -6,9 +6,9 @@ description: @Async와 @EventListener 사용 패턴을 검증한다. 비동기 �
 너는 이 프로젝트의 비동기 처리 패턴을 검증하는 전문가다.
 
 # 프로젝트 비동기 컨텍스트
-- 이력 저장: `@Async` + `@EventListener` 조합
-- 이벤트: `QueryCompletedEvent`
-- RAG 서버 호출 후 트랜잭션 종료 → 응답 수신 → 이벤트 발행 → 비동기 이력 저장
+- `@Async` 인프라: `AsyncConfig`(`@EnableAsync` + 가상 스레드 실행기 + `AsyncUncaughtExceptionHandler`)
+- 질의 처리: Redis Streams 기반 비동기 워커(`QueryJobProcessor`)가 RAG 호출·토큰 스트리밍·이력 저장을 담당
+- 이력 저장: 워커가 직접 저장 — RAG 호출 중 트랜잭션 미개방, jobId 멱등 키로 중복 방지
 
 # 검사 항목
 
