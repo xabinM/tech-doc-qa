@@ -19,9 +19,8 @@ const schema = z.object({ question: z.string().min(1, '질문을 입력해주세
 type FormValues = z.infer<typeof schema>;
 
 type SubmitResult = {
-  status: 'completed' | 'accepted';
-  jobId?: string;
-  answer?: string;
+  status: 'accepted';
+  jobId: string;
   sessionId: number;
 };
 
@@ -180,12 +179,7 @@ export function ChatPage() {
         setCurrentSessionId(data.sessionId);
         queryClient.invalidateQueries({ queryKey: ['sessions'] });
       }
-      if (data.status === 'completed') {
-        appendToLastAnswer(data.answer ?? '');
-        setStreaming(false);
-      } else {
-        startStream(data.jobId!);
-      }
+      startStream(data.jobId);
     } catch (e) {
       setStreaming(false);
       setPendingMessages((prev) => prev.slice(0, -1)); // 낙관적으로 추가한 빈 턴 제거

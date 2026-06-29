@@ -3,9 +3,8 @@ import { backendFetch, ApiError } from '@/lib/api/backend';
 import { withAuth } from '@/lib/api/withAuth';
 
 type QuerySubmitResponse = {
-  status: 'completed' | 'accepted';
-  jobId?: string;
-  answer?: string;
+  status: 'accepted';
+  jobId: string;
   sessionId: number;
 };
 
