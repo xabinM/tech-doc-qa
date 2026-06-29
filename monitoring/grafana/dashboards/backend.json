@@ -161,7 +161,7 @@
       "id": 5,
       "type": "timeseries",
       "title": "질문 처리 시간 P50 / P95 / P99 (query.duration)",
-      "description": "RAG 호출 포함 전체 처리 시간. 캐시 적용 전후 비교 핵심 지표.",
+      "description": "RAG 호출 포함 전체 처리 시간.",
       "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
@@ -308,98 +308,11 @@
       ]
     },
     {
-      "id": 9,
-      "type": "timeseries",
-      "title": "캐시 히트 / 미스 (L1 · L2 · RAG 실호출)",
-      "description": "캐시 적용 전후 비교 핵심 지표. miss가 줄수록 LLM API 비용 절감. Stampede blocked = 동시 미스를 캐시로 흡수한 횟수.",
-      "gridPos": { "x": 0, "y": 32, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "lineWidth": 2, "fillOpacity": 10 },
-          "unit": "short"
-        }
-      },
-      "options": {
-        "legend": { "calcs": ["lastNotNull", "sum"], "displayMode": "table", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "desc" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(cache_query_hit_total{application=\"backend\", level=\"L1\"}[1m])",
-          "legendFormat": "L1 히트/s",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(cache_query_hit_total{application=\"backend\", level=\"L2\"}[1m])",
-          "legendFormat": "L2 히트/s",
-          "refId": "B"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(cache_query_miss_total{application=\"backend\"}[1m])",
-          "legendFormat": "미스(RAG 실호출)/s",
-          "refId": "C"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(cache_query_stampede_blocked_total{application=\"backend\"}[1m])",
-          "legendFormat": "Stampede 차단/s",
-          "refId": "D"
-        }
-      ]
-    },
-    {
-      "id": 10,
-      "type": "timeseries",
-      "title": "L1 캐시 히트율 · 항목 수",
-      "description": "히트율이 높을수록 Redis/LLM 호출 절감. 항목 수가 max(500)에 도달하면 eviction 발생.",
-      "gridPos": { "x": 12, "y": 32, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "lineWidth": 2, "fillOpacity": 10 }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "히트율" },
-            "properties": [{ "id": "unit", "value": "percentunit" }, { "id": "custom.axisPlacement", "value": "right" }]
-          },
-          {
-            "matcher": { "id": "byName", "options": "L1 항목 수" },
-            "properties": [{ "id": "unit", "value": "short" }]
-          }
-        ]
-      },
-      "options": {
-        "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "cache_query_l1_hit_rate{application=\"backend\"}",
-          "legendFormat": "히트율",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "cache_query_l1_size{application=\"backend\"}",
-          "legendFormat": "L1 항목 수",
-          "refId": "B"
-        }
-      ]
-    },
-    {
       "id": 11,
       "type": "timeseries",
       "title": "멱등성 — 중복 차단 vs 신규 요청",
-      "description": "replayed: 저장된 응답으로 LLM 호출 없이 처리된 중복 요청. new: 최초 등록 요청. 네트워크 재시도 폭풍 시 replayed 급증.",
-      "gridPos": { "x": 0, "y": 40, "w": 24, "h": 8 },
+      "description": "replayed: 저장된 jobId로 동일 스트림에 재구독된 중복 요청. new: 최초 등록 요청. 네트워크 재시도 폭풍 시 replayed 급증.",
+      "gridPos": { "x": 0, "y": 32, "w": 24, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
@@ -438,7 +351,7 @@
       "type": "timeseries",
       "title": "배치 Job 실행 횟수 (job별 / 상태별)",
       "description": "COMPLETED/FAILED 추이로 배치 안정성 모니터링. FAILED 급증 시 로그에서 원인 확인.",
-      "gridPos": { "x": 0, "y": 48, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 40, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
@@ -471,7 +384,7 @@
       "type": "timeseries",
       "title": "배치 Job 실행시간 & 처리 아이템 수",
       "description": "job.duration: 정리/집계 Job 소요시간(초). items.processed: 청크 기반으로 처리된 레코드 수.",
-      "gridPos": { "x": 12, "y": 48, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 40, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
