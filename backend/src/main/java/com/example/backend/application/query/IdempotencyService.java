@@ -37,7 +37,6 @@ public class IdempotencyService {
 
     private static final String KEY_PREFIX    = "idempotency:";
     private static final Duration PROCESSING_TTL = Duration.ofSeconds(60);
-    private static final Duration COMPLETED_TTL  = Duration.ofHours(24);
     private static final Duration JOB_TTL        = Duration.ofHours(1);   // answer:{jobId} 스트림 EXPIRE와 정렬
     private static final Duration FAILED_TTL     = Duration.ofMinutes(5);
 
@@ -70,7 +69,6 @@ public class IdempotencyService {
      * 요청 처리를 시작하려고 시도한다.
      *
      * @return StartResult.New           → 최초 요청, 처리 진행
-     *         StartResult.ReplayAnswer  → 동기 완료된 요청(캐시 히트), 저장 답변 반환
      *         StartResult.ReplayJob     → 비동기 작업이 이미 발행됨, 동일 jobId로 스트림 재구독
      *         StartResult.StillProcessing → 다른 스레드가 처리 중, 최대 대기 초과
      */
@@ -84,7 +82,7 @@ public class IdempotencyService {
                 case COMPLETED -> {
                     replayedCounter.increment();
                     log.debug("idempotency: 중복 요청 차단 - key={}", idempotencyKey);
-                    yield toReplay(record);
+                    yield new StartResult.ReplayJob(record.jobId, record.sessionId);
                 }
                 case PROCESSING -> {
                     // 다른 스레드(또는 인스턴스)가 처리 중 → 폴링 대기
@@ -114,16 +112,6 @@ public class IdempotencyService {
         return waitForCompletion(key, idempotencyKey);
     }
 
-    /** 동기 처리(캐시 히트) 성공 시 답변을 저장한다 (24시간 유지) — 중복 요청은 답변을 그대로 반환 */
-    public void complete(Long userId, String idempotencyKey, String answer, Long sessionId) {
-        String key = redisKey(userId, idempotencyKey);
-        redisTemplate.opsForValue().set(
-                key,
-                serialize(IdempotencyRecord.completedWithAnswer(answer, sessionId)),
-                COMPLETED_TTL
-        );
-    }
-
     /** 비동기 작업 발행 시 jobId를 저장한다 (1시간 유지) — 중복 요청은 같은 jobId로 동일 스트림에 재구독 */
     public void registerJob(Long userId, String idempotencyKey, String jobId, Long sessionId) {
         String key = redisKey(userId, idempotencyKey);
@@ -139,7 +127,7 @@ public class IdempotencyService {
         String key = redisKey(userId, idempotencyKey);
         redisTemplate.opsForValue().set(
                 key,
-                serialize(new IdempotencyRecord(Status.FAILED, null, null, errorCode)),
+                serialize(new IdempotencyRecord(Status.FAILED, null, errorCode)),
                 FAILED_TTL
         );
     }
@@ -164,7 +152,7 @@ public class IdempotencyService {
                 switch (record.status) {
                     case COMPLETED -> {
                         replayedCounter.increment();
-                        return toReplay(record);
+                        return new StartResult.ReplayJob(record.jobId, record.sessionId);
                     }
                     case FAILED -> {
                         // 원래 처리가 실패 → 바로 재시도 허용 (StillProcessing 반환 불필요)
@@ -180,13 +168,6 @@ public class IdempotencyService {
         // 최대 대기 초과: 처리 중임을 클라이언트에 알림
         log.warn("idempotency: PROCESSING 대기 초과 - key={}", idempotencyKey);
         return new StartResult.StillProcessing();
-    }
-
-    /** COMPLETED 레코드를 답변(동기) 또는 jobId(비동기)에 따라 적절한 Replay 결과로 변환한다. */
-    private StartResult toReplay(IdempotencyRecord record) {
-        return record.answer != null
-                ? new StartResult.ReplayAnswer(record.answer, record.sessionId)
-                : new StartResult.ReplayJob(record.jobId, record.sessionId);
     }
 
     private void markProcessing(String key) {
@@ -222,7 +203,6 @@ public class IdempotencyService {
     /** Redis에 저장되는 멱등성 기록 */
     public static class IdempotencyRecord {
         @JsonProperty public Status status;
-        @JsonProperty public String answer;
         @JsonProperty public Long   sessionId;
         @JsonProperty public String errorCode;
         @JsonProperty public String jobId;
@@ -233,18 +213,10 @@ public class IdempotencyService {
             this.status = status;
         }
 
-        public IdempotencyRecord(Status status, String answer, Long sessionId, String errorCode) {
+        public IdempotencyRecord(Status status, Long sessionId, String errorCode) {
             this.status    = status;
-            this.answer    = answer;
             this.sessionId = sessionId;
             this.errorCode = errorCode;
-        }
-
-        static IdempotencyRecord completedWithAnswer(String answer, Long sessionId) {
-            IdempotencyRecord r = new IdempotencyRecord(Status.COMPLETED);
-            r.answer = answer;
-            r.sessionId = sessionId;
-            return r;
         }
 
         static IdempotencyRecord completedWithJob(String jobId, Long sessionId) {
@@ -260,18 +232,15 @@ public class IdempotencyService {
      *
      * Controller에서:
      *   switch (result) {
-     *     case ReplayAnswer r   -> return 200 + r.answer ...
      *     case ReplayJob r      -> return 202 + r.jobId ...
      *     case StillProcessing  -> throw ...
      *     case New              -> { 실제 제출 ... }
      *   }
      */
     public sealed interface StartResult
-            permits StartResult.New, StartResult.ReplayAnswer, StartResult.ReplayJob, StartResult.StillProcessing {
+            permits StartResult.New, StartResult.ReplayJob, StartResult.StillProcessing {
 
         record New() implements StartResult {}
-
-        record ReplayAnswer(String answer, Long sessionId) implements StartResult {}
 
         record ReplayJob(String jobId, Long sessionId) implements StartResult {}
 

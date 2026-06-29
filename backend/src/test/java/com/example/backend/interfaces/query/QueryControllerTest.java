@@ -58,28 +58,10 @@ class QueryControllerTest {
 
     @Test
     @WithMockUser
-    @DisplayName("캐시 히트 시 200 OK와 답변 반환")
-    void query_cacheHit_returns200() throws Exception {
+    @DisplayName("질의 제출 시 202 Accepted와 jobId 반환")
+    void query_returns202() throws Exception {
         given(queryService.submit(any(), anyString(), any()))
-                .willReturn(new QueryService.SubmitResult.Completed("Spring은 자바 프레임워크입니다.", 1L));
-
-        mockMvc.perform(post("/api/v1/query")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new QueryRequest("Spring이란?", null))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.status").value("completed"))
-                .andExpect(jsonPath("$.data.answer").value("Spring은 자바 프레임워크입니다."))
-                .andExpect(jsonPath("$.data.sessionId").value(1));
-    }
-
-    @Test
-    @WithMockUser
-    @DisplayName("캐시 미스 시 202 Accepted와 jobId 반환")
-    void query_cacheMiss_returns202() throws Exception {
-        given(queryService.submit(any(), anyString(), any()))
-                .willReturn(new QueryService.SubmitResult.Accepted("job-abc-123", 5L));
+                .willReturn(new QueryService.SubmitResult("job-abc-123", 5L));
 
         mockMvc.perform(post("/api/v1/query")
                         .with(csrf())

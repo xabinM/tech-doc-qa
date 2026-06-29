@@ -25,7 +25,6 @@ public class QueryController {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int IDEMPOTENCY_KEY_MAX_LENGTH = 128;
-    private static final String COMPLETED_MESSAGE = "답변이 생성되었습니다";
     private static final String ACCEPTED_MESSAGE = "답변을 생성하고 있습니다";
 
     private final QueryService queryService;
@@ -38,15 +37,13 @@ public class QueryController {
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
     ) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
-            return toResponse(queryService.submit(userId, request.question(), request.sessionId()));
+            QueryService.SubmitResult result = queryService.submit(userId, request.question(), request.sessionId());
+            return accepted(result.jobId(), result.sessionId());
         }
 
         String key = sanitizeKey(idempotencyKey);
 
         return switch (idempotencyService.tryStart(userId, key)) {
-
-            // 동기 완료된 요청(캐시 히트): 저장된 답변 즉시 반환
-            case IdempotencyService.StartResult.ReplayAnswer r -> completed(r.answer(), r.sessionId());
 
             // 비동기 작업이 이미 발행됨: 동일 jobId로 스트림 재구독 안내
             case IdempotencyService.StartResult.ReplayJob r -> accepted(r.jobId(), r.sessionId());
@@ -74,16 +71,8 @@ public class QueryController {
     private ResponseEntity<ApiResponse<QuerySubmitResponse>> submitWithIdempotency(Long userId, String key, QueryRequest request) {
         try {
             QueryService.SubmitResult result = queryService.submit(userId, request.question(), request.sessionId());
-            return switch (result) {
-                case QueryService.SubmitResult.Completed c -> {
-                    idempotencyService.complete(userId, key, c.answer(), c.sessionId());
-                    yield completed(c.answer(), c.sessionId());
-                }
-                case QueryService.SubmitResult.Accepted a -> {
-                    idempotencyService.registerJob(userId, key, a.jobId(), a.sessionId());
-                    yield accepted(a.jobId(), a.sessionId());
-                }
-            };
+            idempotencyService.registerJob(userId, key, result.jobId(), result.sessionId());
+            return accepted(result.jobId(), result.sessionId());
         } catch (Exception e) {
             // 실패 기록 저장: 5분 후 동일 키로 재시도 가능
             String errorCode = e instanceof CustomException ce
@@ -92,17 +81,6 @@ public class QueryController {
             idempotencyService.fail(userId, key, errorCode);
             throw e;
         }
-    }
-
-    private ResponseEntity<ApiResponse<QuerySubmitResponse>> toResponse(QueryService.SubmitResult result) {
-        return switch (result) {
-            case QueryService.SubmitResult.Completed c -> completed(c.answer(), c.sessionId());
-            case QueryService.SubmitResult.Accepted a -> accepted(a.jobId(), a.sessionId());
-        };
-    }
-
-    private ResponseEntity<ApiResponse<QuerySubmitResponse>> completed(String answer, Long sessionId) {
-        return ResponseEntity.ok(ApiResponse.ok(COMPLETED_MESSAGE, QuerySubmitResponse.completed(answer, sessionId)));
     }
 
     private ResponseEntity<ApiResponse<QuerySubmitResponse>> accepted(String jobId, Long sessionId) {

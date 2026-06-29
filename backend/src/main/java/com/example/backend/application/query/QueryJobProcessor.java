@@ -31,7 +31,6 @@ public class QueryJobProcessor {
 
     private final ChatSessionService chatSessionService;
     private final RagPort ragPort;
-    private final QueryCacheService queryCacheService;
     private final QueryLogRepository queryLogRepository;
     private final AnswerStream answerStream;
 
@@ -40,18 +39,7 @@ public class QueryJobProcessor {
             MDC.put(MDC_REQUEST_ID, job.requestId());  // 제출 시점 추적 ID 복원 (end-to-end 로그)
         }
         try {
-            String cacheKey = QueryCacheService.cacheKeyOf(job.question());
-
-            // 캐시 재확인(제출 이후 다른 워커가 채웠을 수 있음) — 히트 시 전체 답변을 한 번에 전달
-            var cached = queryCacheService.getIfCached(cacheKey);
-            if (cached.isPresent()) {
-                answerStream.publishToken(job.jobId(), cached.get());
-                answerStream.publishDone(job.jobId());
-                saveHistoryQuietly(job, cached.get());
-                return;
-            }
-
-            // 미스 → RAG 토큰 스트리밍: 도착하는 토큰을 즉시 중계하며 전체 답변을 누적
+            // RAG 토큰 스트리밍: 도착하는 토큰을 즉시 중계하며 전체 답변을 누적
             List<ConversationTurn> history = chatSessionService.loadConversationHistory(job.sessionId());
             StringBuilder answer = new StringBuilder();
             ragPort.askStream(job.question(), history, token -> {
@@ -60,9 +48,7 @@ public class QueryJobProcessor {
             });
             answerStream.publishDone(job.jobId());
 
-            String full = answer.toString();
-            queryCacheService.put(cacheKey, full);
-            saveHistoryQuietly(job, full);
+            saveHistoryQuietly(job, answer.toString());
         } catch (CustomException e) {
             log.warn("질의 작업 처리 실패 - jobId={}, code={}", job.jobId(), e.getErrorCode().getCode());
             answerStream.publishError(job.jobId(), e.getErrorCode().getCode());

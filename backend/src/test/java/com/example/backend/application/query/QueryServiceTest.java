@@ -1,6 +1,5 @@
 package com.example.backend.application.query;
 
-import com.example.backend.application.query.event.QueryCompletedEvent;
 import com.example.backend.application.query.port.JobOwnershipStore;
 import com.example.backend.application.query.port.QueryJobQueue;
 import com.example.backend.common.exception.CustomException;
@@ -15,23 +14,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,13 +41,7 @@ class QueryServiceTest {
     QueryLogRepository queryLogRepository;
 
     @Mock
-    ApplicationEventPublisher eventPublisher;
-
-    @Mock
     StringRedisTemplate redisTemplate;
-
-    @Mock
-    QueryCacheService queryCacheService;
 
     @Mock
     QueryJobQueue queryJobQueue;
@@ -63,57 +52,30 @@ class QueryServiceTest {
     @BeforeEach
     void setUp() {
         // MeterRegistry는 실제 SimpleMeterRegistry 사용 — Counter.register()가 정상 동작해야 함
-        queryService = new QueryService(chatSessionService, queryLogRepository, eventPublisher,
-                redisTemplate, new SimpleMeterRegistry(), queryCacheService, queryJobQueue, jobOwnershipStore);
+        queryService = new QueryService(chatSessionService, queryLogRepository,
+                redisTemplate, new SimpleMeterRegistry(), queryJobQueue, jobOwnershipStore);
         ReflectionTestUtils.setField(queryService, "dailyMax", 20);
         queryService.initMetrics();
     }
 
     @Test
-    @DisplayName("캐시 히트 시 동기 완료(Completed) 반환 및 이력 이벤트 발행")
-    void submit_cacheHit_returnsCompletedAndPublishesEvent() {
+    @DisplayName("질의 제출 시 작업 큐 발행 및 jobId 반환")
+    void submit_publishesJobAndReturnsJobId() {
         given(redisTemplate.execute(any(RedisScript.class), anyList(), any())).willReturn(1L);
         given(chatSessionService.prepareSession(eq(1L), eq("Spring이란?"), isNull()))
                 .willReturn(new ChatSessionService.SessionContext(100L, List.of()));
-        given(queryCacheService.getIfCached(anyString()))
-                .willReturn(Optional.of("Spring은 자바 프레임워크입니다."));
 
         QueryService.SubmitResult result = queryService.submit(1L, "Spring이란?", null);
 
-        assertThat(result).isInstanceOf(QueryService.SubmitResult.Completed.class);
-        QueryService.SubmitResult.Completed completed = (QueryService.SubmitResult.Completed) result;
-        assertThat(completed.answer()).isEqualTo("Spring은 자바 프레임워크입니다.");
-        assertThat(completed.sessionId()).isEqualTo(100L);
-
-        ArgumentCaptor<QueryCompletedEvent> captor = ArgumentCaptor.forClass(QueryCompletedEvent.class);
-        verify(eventPublisher).publishEvent(captor.capture());
-        assertThat(captor.getValue().answer()).isEqualTo("Spring은 자바 프레임워크입니다.");
-        assertThat(captor.getValue().sessionId()).isEqualTo(100L);
-        verify(queryJobQueue, never()).publish(any());
-    }
-
-    @Test
-    @DisplayName("캐시 미스 시 작업 큐 발행(Accepted) 및 jobId 반환")
-    void submit_cacheMiss_publishesJobAndReturnsAccepted() {
-        given(redisTemplate.execute(any(RedisScript.class), anyList(), any())).willReturn(1L);
-        given(chatSessionService.prepareSession(eq(1L), eq("Spring이란?"), isNull()))
-                .willReturn(new ChatSessionService.SessionContext(100L, List.of()));
-        given(queryCacheService.getIfCached(anyString())).willReturn(Optional.empty());
-
-        QueryService.SubmitResult result = queryService.submit(1L, "Spring이란?", null);
-
-        assertThat(result).isInstanceOf(QueryService.SubmitResult.Accepted.class);
-        QueryService.SubmitResult.Accepted accepted = (QueryService.SubmitResult.Accepted) result;
-        assertThat(accepted.jobId()).isNotBlank();
-        assertThat(accepted.sessionId()).isEqualTo(100L);
+        assertThat(result.jobId()).isNotBlank();
+        assertThat(result.sessionId()).isEqualTo(100L);
 
         ArgumentCaptor<QueryJob> captor = ArgumentCaptor.forClass(QueryJob.class);
         verify(queryJobQueue).publish(captor.capture());
-        assertThat(captor.getValue().jobId()).isEqualTo(accepted.jobId());
+        assertThat(captor.getValue().jobId()).isEqualTo(result.jobId());
         assertThat(captor.getValue().question()).isEqualTo("Spring이란?");
         assertThat(captor.getValue().sessionId()).isEqualTo(100L);
-        verify(jobOwnershipStore).register(accepted.jobId(), 1L);
-        verify(eventPublisher, never()).publishEvent(any());
+        verify(jobOwnershipStore).register(result.jobId(), 1L);
     }
 
     @Test
